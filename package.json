@@ -1,6 +1,7 @@
 {
   "name": "jscratch",
   "displayName": "JScratch",
+  "icon": "media/icon.png",
   "description": "In-Editor ETL Scratchpad",
   "version": "0.0.1",
   "engines": {
