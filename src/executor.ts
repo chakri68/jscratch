@@ -4,11 +4,12 @@ import * as path from "path";
 import * as os from "os";
 import * as cp from "child_process";
 import { SessionManager, PipelineNode } from "./sessionManager";
+import { getTsxPath } from "./utils";
 
 export class Executor {
   constructor(
     private sessionManager: SessionManager,
-    private extensionUri: vscode.Uri,
+    private extensionUri: vscode.Uri
   ) {}
 
   async runTransform(nodeOrUri: PipelineNode | vscode.Uri) {
@@ -39,7 +40,7 @@ export class Executor {
     // Get parent node (input)
     const parentNode = await this.sessionManager.getNode(
       sessionId,
-      node.parentId,
+      node.parentId
     );
     if (!parentNode) {
       vscode.window.showErrorMessage("Parent node not found");
@@ -110,8 +111,17 @@ run();
       // We assume 'tsx' is available in the user's PATH or we try to find it.
       // For now, let's try to use 'npx tsx' or just 'tsx' if installed globally.
 
-      const cmd = process.platform === "win32" ? "npx.cmd" : "npx";
-      const args = ["tsx", wrapperPath, tempInputPath];
+      // Show the path in a popup
+
+      const tsxBin = await getTsxPath();
+      if (!tsxBin) {
+        vscode.window.showErrorMessage(
+          "'tsx' binary not found. Please install it globally or set the path manually."
+        );
+        return;
+      }
+
+      const args = [wrapperPath, tempInputPath];
 
       await vscode.window.withProgress(
         {
@@ -121,7 +131,7 @@ run();
         },
         async (progress, token) => {
           return new Promise<void>((resolve, reject) => {
-            const child = cp.spawn(cmd, args, {
+            const child = cp.spawn(tsxBin, args, {
               cwd: tempDir,
               env: { ...process.env },
             });
@@ -141,10 +151,11 @@ run();
               if (code === 0) {
                 try {
                   // Check for existing output node
-                  const metadata =
-                    await this.sessionManager.getMetadata(sessionId);
+                  const metadata = await this.sessionManager.getMetadata(
+                    sessionId
+                  );
                   const existingOutputNode = metadata.nodes.find(
-                    (n) => n.parentId === node!.id && n.type === "output",
+                    (n) => n.parentId === node!.id && n.type === "output"
                   );
 
                   let outputFilename: string;
@@ -161,7 +172,7 @@ run();
                   // 5. Save Output
                   await vscode.workspace.fs.writeFile(
                     outputUri,
-                    new TextEncoder().encode(stdout),
+                    new TextEncoder().encode(stdout)
                   );
 
                   // 6. Add Output Node if it didn't exist
@@ -176,8 +187,9 @@ run();
                   }
 
                   // Open Output
-                  const doc =
-                    await vscode.workspace.openTextDocument(outputUri);
+                  const doc = await vscode.workspace.openTextDocument(
+                    outputUri
+                  );
                   await vscode.window.showTextDocument(doc, {
                     viewColumn: vscode.ViewColumn.Beside,
                   });
@@ -190,11 +202,11 @@ run();
               }
             });
           });
-        },
+        }
       );
     } catch (error: any) {
       vscode.window.showErrorMessage(
-        `Execution failed: ${error.message || error}`,
+        `Execution failed: ${error.message || error}`
       );
     } finally {
       // Cleanup
