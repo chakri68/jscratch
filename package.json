@@ -79,6 +79,16 @@
         "command": "jscratch.clearHistory",
         "title": "Clear History",
         "icon": "$(clear-all)"
+      },
+      {
+        "command": "jscratch.deleteNode",
+        "title": "Delete",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "jscratch.reloadTypes",
+        "title": "Reload Types",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
@@ -118,6 +128,16 @@
         {
           "command": "jscratch.deleteSession",
           "when": "view == jscratch.historyView && viewItem == session",
+          "group": "inline"
+        },
+        {
+          "command": "jscratch.deleteNode",
+          "when": "view == jscratch.pipelineView && viewItem == transform",
+          "group": "inline"
+        },
+        {
+          "command": "jscratch.reloadTypes",
+          "when": "view == jscratch.pipelineView && viewItem == transform",
           "group": "inline"
         }
       ]

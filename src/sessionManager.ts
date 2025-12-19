@@ -139,4 +139,38 @@ export class SessionManager {
     const metadata = await this.getMetadata(sessionId);
     return metadata.nodes.find((n) => n.id === nodeId);
   }
+
+  public async deleteNode(sessionId: string, nodeId: string): Promise<void> {
+    const metadata = await this.getMetadata(sessionId);
+    const nodesToDelete = new Set<string>();
+    const sessionUri = this.getSessionUri(sessionId);
+
+    // Helper to recursively find descendants
+    const collectDescendants = (parentId: string) => {
+      nodesToDelete.add(parentId);
+      const children = metadata.nodes.filter((n) => n.parentId === parentId);
+      for (const child of children) {
+        collectDescendants(child.id);
+      }
+    };
+
+    collectDescendants(nodeId);
+
+    // Delete files
+    for (const id of nodesToDelete) {
+      const node = metadata.nodes.find((n) => n.id === id);
+      if (node) {
+        try {
+          const fileUri = vscode.Uri.joinPath(sessionUri, node.filename);
+          await vscode.workspace.fs.delete(fileUri);
+        } catch {
+          // Ignore if file doesn't exist
+        }
+      }
+    }
+
+    // Update metadata
+    metadata.nodes = metadata.nodes.filter((n) => !nodesToDelete.has(n.id));
+    await this.saveMetadata(sessionId, metadata);
+  }
 }

@@ -228,11 +228,13 @@ export function activate(context: vscode.ExtensionContext) {
         const defaultScript = `
 import * as path from 'path';
 
+/* TYPE DEFS START */
 // Type definitions for the injected global 'input'
 interface InputData {
     raw: string;
     data: ${typeDefinition};
 }
+/* TYPE DEFS END */
 
 // Declare the global 'input' variable so TypeScript knows about it
 declare const input: InputData;
@@ -326,6 +328,121 @@ export function transform(): any {
     },
   );
 
+  let deleteNodeCommand = vscode.commands.registerCommand(
+    "jscratch.deleteNode",
+    async (node: PipelineNode) => {
+      if (!sessionManager.activeSessionId || !node) {
+        return;
+      }
+
+      const answer = await vscode.window.showWarningMessage(
+        `Are you sure you want to delete '${node.label}'? All subsequent nodes will also be deleted.`,
+        "Yes",
+        "No",
+      );
+
+      if (answer === "Yes") {
+        try {
+          await sessionManager.deleteNode(
+            sessionManager.activeSessionId,
+            node.id,
+          );
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to delete node: ${error}`);
+        }
+      }
+    },
+  );
+
+  let reloadTypesCommand = vscode.commands.registerCommand(
+    "jscratch.reloadTypes",
+    async (node: PipelineNode) => {
+      if (!sessionManager.activeSessionId || !node || !node.parentId) {
+        return;
+      }
+
+      try {
+        const sessionUri = sessionManager.getSessionUri(
+          sessionManager.activeSessionId,
+        );
+
+        // 1. Get Parent Node (Input)
+        const parentNode = await sessionManager.getNode(
+          sessionManager.activeSessionId,
+          node.parentId,
+        );
+        if (!parentNode) {
+          vscode.window.showErrorMessage("Parent node not found");
+          return;
+        }
+
+        // 2. Infer Type from Parent File
+        const parentUri = vscode.Uri.joinPath(sessionUri, parentNode.filename);
+        let typeDefinition = "any";
+
+        try {
+          const parentContentBytes =
+            await vscode.workspace.fs.readFile(parentUri);
+          const parentContent = new TextDecoder().decode(parentContentBytes);
+          const ext = path.extname(parentNode.filename).toLowerCase();
+
+          if (ext === ".json") {
+            try {
+              const obj = JSON.parse(parentContent);
+              typeDefinition = inferType(obj, "    ");
+            } catch {
+              // Invalid JSON
+            }
+          } else if (ext === ".csv") {
+            typeDefinition = "string[][]";
+          } else if (ext === ".txt") {
+            typeDefinition = "string[]";
+          }
+        } catch (e) {
+          console.error("Failed to infer type:", e);
+        }
+
+        // 3. Update Transformation File
+        const transformUri = vscode.Uri.joinPath(sessionUri, node.filename);
+        const transformContentBytes =
+          await vscode.workspace.fs.readFile(transformUri);
+        const transformContent = new TextDecoder().decode(
+          transformContentBytes,
+        );
+
+        // Replace the InputData interface
+        const newInterface = `/* TYPE DEFS START */
+// Type definitions for the injected global 'input'
+interface InputData {
+    raw: string;
+    data: ${typeDefinition};
+}
+/* TYPE DEFS END */`;
+
+        const newContent = transformContent.replace(
+          /\/\* TYPE DEFS START \*\/[\s\S]*?\/\* TYPE DEFS END \*\//,
+          newInterface,
+        );
+
+        if (newContent !== transformContent) {
+          await vscode.workspace.fs.writeFile(
+            transformUri,
+            new TextEncoder().encode(newContent),
+          );
+          vscode.window.showInformationMessage(
+            "Type definitions reloaded successfully.",
+          );
+        } else {
+          vscode.window.showInformationMessage(
+            "Type definitions are already up to date.",
+          );
+        }
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to reload types: ${error}`);
+      }
+    },
+  );
+
   context.subscriptions.push(
     newSessionCommand,
     loadSessionCommand,
@@ -335,6 +452,8 @@ export function transform(): any {
     runTransformCommand,
     exportFileCommand,
     clearHistoryCommand,
+    deleteNodeCommand,
+    reloadTypesCommand,
   );
 }
 
