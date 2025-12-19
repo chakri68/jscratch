@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as cp from "child_process";
+import * as esbuild from "esbuild";
 import { SessionManager, PipelineNode } from "./sessionManager";
 
 export class Executor {
@@ -106,12 +107,22 @@ run();
 `;
       fs.writeFileSync(wrapperPath, wrapperScript);
 
-      // 4. Execute with tsx
-      // We assume 'tsx' is available in the user's PATH or we try to find it.
-      // For now, let's try to use 'npx tsx' or just 'tsx' if installed globally.
+      // 4. Execute with esbuild + node
+      const outPath = path.join(tempDir, "out.js");
 
-      const cmd = process.platform === "win32" ? "npx.cmd" : "npx";
-      const args = ["tsx", wrapperPath, tempInputPath];
+      try {
+        await esbuild.build({
+          entryPoints: [wrapperPath],
+          bundle: true,
+          platform: "node",
+          outfile: outPath,
+        });
+      } catch (buildError: any) {
+        throw new Error(`Build failed: ${buildError.message}`);
+      }
+
+      const cmd = "node";
+      const args = [outPath, tempInputPath];
 
       await vscode.window.withProgress(
         {
