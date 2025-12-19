@@ -4,6 +4,9 @@
   "icon": "media/icon.png",
   "description": "In-Editor ETL Scratchpad",
   "publisher": "chakri68",
+  "repository": {
+    "url": "https://github.com/chakri68/jscratch/"
+  },
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.85.0"

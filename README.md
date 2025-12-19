@@ -2,7 +2,7 @@
 
 **JScratch** is an "In-Editor ETL Scratchpad" for Visual Studio Code. It allows you to perform quick data transformations, experiments, and pipelines without polluting your main project workspace.
 
-![JScratch Icon](/media/full.png)
+![JScratch Icon](https://github.com/chakri68/jscratch/raw/master/media/full.png)
 
 ## Features
 
