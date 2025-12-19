@@ -1,0 +1,12 @@
+.vscode/**
+.vscode-test/**
+src/**
+.gitignore
+.eslintrc.json
+.eslintignore
+tsconfig.json
+pnpm-lock.yaml
+REQUIREMENTS.md
+vsc-extension-quickstart.md
+**/*.map
+out/test/**
