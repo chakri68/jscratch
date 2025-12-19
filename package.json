@@ -3,6 +3,7 @@
   "displayName": "JScratch",
   "icon": "media/icon.png",
   "description": "In-Editor ETL Scratchpad",
+  "publisher": "chakri68",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.85.0"
@@ -14,7 +15,6 @@
     "onFileSystem:datalab"
   ],
   "main": "./out/extension.js",
-  "publisher": "jscratch",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
