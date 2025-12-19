@@ -73,6 +73,12 @@ Happy with your transformation? Export any file from the virtual pipeline direct
 ## Requirements
 
 - Visual Studio Code 1.85.0 or newer.
+- **Node.js** installed and available in your PATH.
+- **tsx** installed globally (optional, but recommended for faster execution):
+  ```bash
+  npm install -g tsx
+  ```
+  _Note: If `tsx` is not found, JScratch will attempt to run it via `npx`, which may be slower._
 
 ## Release Notes
 

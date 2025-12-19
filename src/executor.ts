@@ -107,13 +107,11 @@ run();
       fs.writeFileSync(wrapperPath, wrapperScript);
 
       // 4. Execute with tsx
-      const tsxPath = path.join(
-        this.extensionUri.fsPath,
-        "node_modules",
-        ".bin",
-        "tsx",
-      );
-      const cmd = process.platform === "win32" ? `${tsxPath}.cmd` : tsxPath;
+      // We assume 'tsx' is available in the user's PATH or we try to find it.
+      // For now, let's try to use 'npx tsx' or just 'tsx' if installed globally.
+
+      const cmd = process.platform === "win32" ? "npx.cmd" : "npx";
+      const args = ["tsx", wrapperPath, tempInputPath];
 
       await vscode.window.withProgress(
         {
@@ -123,7 +121,7 @@ run();
         },
         async (progress, token) => {
           return new Promise<void>((resolve, reject) => {
-            const child = cp.spawn(cmd, [wrapperPath, tempInputPath], {
+            const child = cp.spawn(cmd, args, {
               cwd: tempDir,
               env: { ...process.env },
             });
