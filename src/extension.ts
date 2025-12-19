@@ -191,9 +191,27 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       try {
+        // Check if a transformation already exists for this node
+        const metadata = await sessionManager.getMetadata(
+          sessionManager.activeSessionId,
+        );
+        const existingTransform = metadata.nodes.find(
+          (n) => n.parentId === node.id && n.type === "transform",
+        );
+
         const sessionUri = sessionManager.getSessionUri(
           sessionManager.activeSessionId,
         );
+
+        if (existingTransform) {
+          const existingUri = vscode.Uri.joinPath(
+            sessionUri,
+            existingTransform.filename,
+          );
+          const doc = await vscode.workspace.openTextDocument(existingUri);
+          await vscode.window.showTextDocument(doc);
+          return;
+        }
 
         // Infer type from parent file
         const parentUri = vscode.Uri.joinPath(sessionUri, node.filename);

@@ -151,25 +151,40 @@ run();
             child.on("close", async (code) => {
               if (code === 0) {
                 try {
-                  // 5. Save Output
-                  const outputFilename = `output-${Date.now()}.json`;
-                  const outputUri = vscode.Uri.joinPath(
-                    sessionUri,
-                    outputFilename,
+                  // Check for existing output node
+                  const metadata =
+                    await this.sessionManager.getMetadata(sessionId);
+                  const existingOutputNode = metadata.nodes.find(
+                    (n) => n.parentId === node!.id && n.type === "output",
                   );
+
+                  let outputFilename: string;
+                  let outputUri: vscode.Uri;
+
+                  if (existingOutputNode) {
+                    outputFilename = existingOutputNode.filename;
+                    outputUri = vscode.Uri.joinPath(sessionUri, outputFilename);
+                  } else {
+                    outputFilename = `output-${Date.now()}.json`;
+                    outputUri = vscode.Uri.joinPath(sessionUri, outputFilename);
+                  }
+
+                  // 5. Save Output
                   await vscode.workspace.fs.writeFile(
                     outputUri,
                     new TextEncoder().encode(stdout),
                   );
 
-                  // 6. Add Output Node
-                  await this.sessionManager.addNode(sessionId, {
-                    id: Date.now().toString(),
-                    type: "output",
-                    label: outputFilename,
-                    filename: outputFilename,
-                    parentId: node!.id,
-                  });
+                  // 6. Add Output Node if it didn't exist
+                  if (!existingOutputNode) {
+                    await this.sessionManager.addNode(sessionId, {
+                      id: Date.now().toString(),
+                      type: "output",
+                      label: outputFilename,
+                      filename: outputFilename,
+                      parentId: node!.id,
+                    });
+                  }
 
                   // Open Output
                   const doc =
