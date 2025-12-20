@@ -3,8 +3,8 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as cp from "child_process";
+import * as esbuild from "esbuild";
 import { SessionManager, PipelineNode } from "./sessionManager";
-import { getTsxPath } from "./utils";
 
 export class Executor {
   constructor(
@@ -107,21 +107,22 @@ run();
 `;
       fs.writeFileSync(wrapperPath, wrapperScript);
 
-      // 4. Execute with tsx
-      // We assume 'tsx' is available in the user's PATH or we try to find it.
-      // For now, let's try to use 'npx tsx' or just 'tsx' if installed globally.
-
-      // Show the path in a popup
-
-      const tsxBin = await getTsxPath();
-      if (!tsxBin) {
-        vscode.window.showErrorMessage(
-          "'tsx' binary not found. Please install it globally or set the path manually."
-        );
+      // 4. Compile with esbuild
+      const outFile = path.join(tempDir, "out.js");
+      try {
+        await esbuild.build({
+          entryPoints: [wrapperPath],
+          bundle: true,
+          platform: "node",
+          outfile: outFile,
+        });
+      } catch (e) {
+        vscode.window.showErrorMessage(`Compilation failed: ${e}`);
         return;
       }
 
-      const args = [wrapperPath, tempInputPath];
+      // 5. Execute with node
+      const args = [outFile, tempInputPath];
 
       await vscode.window.withProgress(
         {
@@ -131,7 +132,7 @@ run();
         },
         async (progress, token) => {
           return new Promise<void>((resolve, reject) => {
-            const child = cp.spawn(tsxBin, args, {
+            const child = cp.spawn(process.execPath, args, {
               cwd: tempDir,
               env: { ...process.env },
             });
