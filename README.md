@@ -61,24 +61,18 @@ Happy with your transformation? Export any file from the virtual pipeline direct
 
 ## Commands
 
-| Command | Description |
-|Str|Str|
-| `JScratch: New Session` | Create a new, empty scratchpad session. |
-| `JScratch: Create Input` | Add a new root file to the pipeline. |
-| `JScratch: Add Transformation` | Attach a processing script to a node. |
-| `JScratch: Run Transformation` | Execute the script and generate output. |
-| `JScratch: Export File` | Save a virtual file to your local filesystem. |
-| `JScratch: Clear History` | Delete all saved sessions. |
+| Command                        | Description                                   |
+| ------------------------------ | --------------------------------------------- |
+| `JScratch: New Session`        | Create a new, empty scratchpad session.       |
+| `JScratch: Create Input`       | Add a new root file to the pipeline.          |
+| `JScratch: Add Transformation` | Attach a processing script to a node.         |
+| `JScratch: Run Transformation` | Execute the script and generate output.       |
+| `JScratch: Export File`        | Save a virtual file to your local filesystem. |
+| `JScratch: Clear History`      | Delete all saved sessions.                    |
 
 ## Requirements
 
 - Visual Studio Code 1.85.0 or newer.
-- **Node.js** installed and available in your PATH.
-- **tsx** installed globally (optional, but recommended for faster execution):
-  ```bash
-  npm install -g tsx
-  ```
-  _Note: If `tsx` is not found, JScratch will attempt to run it via `npx`, which may be slower._
 
 ## Release Notes
 
@@ -87,3 +81,17 @@ Happy with your transformation? Export any file from the virtual pipeline direct
 - Initial release of JScratch.
 - Virtual File System implementation.
 - Basic Pipeline and History management.
+
+### 0.0.2
+
+- Moved to using tsx from user's global installation
+- Broken because of VSCode restrictions now - PLEASE MOVE TO 0.0.3
+
+### 0.0.3
+
+- Moved to bundling ESBuild with the extension to avoid VSCode restrictions.
+- Improved error handling in transformation scripts.
+
+### 0.0.4
+
+- Fixed docs typos and improved formatting.

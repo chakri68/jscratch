@@ -9,7 +9,7 @@ import { SessionManager, PipelineNode } from "./sessionManager";
 export class Executor {
   constructor(
     private sessionManager: SessionManager,
-    private extensionUri: vscode.Uri
+    private extensionUri: vscode.Uri,
   ) {}
 
   async runTransform(nodeOrUri: PipelineNode | vscode.Uri) {
@@ -40,7 +40,7 @@ export class Executor {
     // Get parent node (input)
     const parentNode = await this.sessionManager.getNode(
       sessionId,
-      node.parentId
+      node.parentId,
     );
     if (!parentNode) {
       vscode.window.showErrorMessage("Parent node not found");
@@ -152,11 +152,10 @@ run();
               if (code === 0) {
                 try {
                   // Check for existing output node
-                  const metadata = await this.sessionManager.getMetadata(
-                    sessionId
-                  );
+                  const metadata =
+                    await this.sessionManager.getMetadata(sessionId);
                   const existingOutputNode = metadata.nodes.find(
-                    (n) => n.parentId === node!.id && n.type === "output"
+                    (n) => n.parentId === node!.id && n.type === "output",
                   );
 
                   let outputFilename: string;
@@ -173,7 +172,7 @@ run();
                   // 5. Save Output
                   await vscode.workspace.fs.writeFile(
                     outputUri,
-                    new TextEncoder().encode(stdout)
+                    new TextEncoder().encode(stdout),
                   );
 
                   // 6. Add Output Node if it didn't exist
@@ -188,9 +187,8 @@ run();
                   }
 
                   // Open Output
-                  const doc = await vscode.workspace.openTextDocument(
-                    outputUri
-                  );
+                  const doc =
+                    await vscode.workspace.openTextDocument(outputUri);
                   await vscode.window.showTextDocument(doc, {
                     viewColumn: vscode.ViewColumn.Beside,
                   });
@@ -203,11 +201,11 @@ run();
               }
             });
           });
-        }
+        },
       );
     } catch (error: any) {
       vscode.window.showErrorMessage(
-        `Execution failed: ${error.message || error}`
+        `Execution failed: ${error.message || error}`,
       );
     } finally {
       // Cleanup
