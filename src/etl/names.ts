@@ -41,3 +41,19 @@ export function outputFilenameFor(
 export function sessionIdFromUri(uri: { path: string }): string | undefined {
   return uri.path.split("/")[1] || undefined;
 }
+
+/** `data.json` -> `data-2.json`, `data-3.json`, … until it doesn't collide. */
+export function uniqueName(name: string, existing: string[]): string {
+  if (!existing.includes(name)) {
+    return name;
+  }
+  const dot = name.lastIndexOf(".");
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot) : "";
+  for (let n = 2; ; n++) {
+    const candidate = `${stem}-${n}${ext}`;
+    if (!existing.includes(candidate)) {
+      return candidate;
+    }
+  }
+}

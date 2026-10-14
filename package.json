@@ -76,33 +76,38 @@
     "commands": [
       {
         "command": "jscratch.newSession",
-        "title": "JScratch: New Session",
+        "title": "New Session",
+        "category": "JScratch",
         "icon": "$(add)"
       },
       {
         "command": "jscratch.loadSession",
-        "title": "Load Session"
+        "title": "Load Session",
+        "category": "JScratch"
       },
       {
         "command": "jscratch.deleteSession",
         "title": "Delete Session",
+        "category": "JScratch",
         "icon": "$(trash)"
       },
       {
-        "command": "jscratch.createInput",
-        "title": "New Input",
+        "command": "jscratch.addInput",
+        "title": "Add Input",
+        "category": "JScratch",
         "icon": "$(file-add)"
       },
       {
         "command": "jscratch.addTransform",
         "title": "Add Transformation",
+        "category": "JScratch",
         "icon": "$(beaker)"
       },
       {
         "command": "jscratch.runTransform",
-        "title": "Run Transformation",
-        "icon": "$(play)",
-        "category": "JScratch"
+        "title": "Run Current Transform",
+        "category": "JScratch",
+        "icon": "$(play)"
       },
       {
         "command": "jscratch.runBranch",
@@ -119,22 +124,31 @@
       {
         "command": "jscratch.exportFile",
         "title": "Export File",
+        "category": "JScratch",
         "icon": "$(arrow-circle-down)"
       },
       {
         "command": "jscratch.clearHistory",
         "title": "Clear History",
+        "category": "JScratch",
         "icon": "$(clear-all)"
       },
       {
         "command": "jscratch.deleteNode",
         "title": "Delete",
+        "category": "JScratch",
         "icon": "$(trash)"
       },
       {
         "command": "jscratch.reloadTypes",
         "title": "Reload Types",
+        "category": "JScratch",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "jscratch.createInput",
+        "title": "Add Input (alias)",
+        "category": "JScratch"
       }
     ],
     "menus": {
@@ -145,8 +159,8 @@
           "group": "navigation"
         },
         {
-          "command": "jscratch.createInput",
-          "when": "view == jscratch.pipelineView",
+          "command": "jscratch.addInput",
+          "when": "view == jscratch.pipelineView && jscratch.hasSession",
           "group": "navigation"
         },
         {
@@ -201,8 +215,58 @@
           "when": "view == jscratch.pipelineView && viewItem == transform",
           "group": "2_format"
         }
+      ],
+      "commandPalette": [
+        {
+          "command": "jscratch.loadSession",
+          "when": "false"
+        },
+        {
+          "command": "jscratch.deleteSession",
+          "when": "false"
+        },
+        {
+          "command": "jscratch.createInput",
+          "when": "false"
+        },
+        {
+          "command": "jscratch.addTransform",
+          "when": "false"
+        },
+        {
+          "command": "jscratch.runBranch",
+          "when": "false"
+        },
+        {
+          "command": "jscratch.setOutputFormat",
+          "when": "false"
+        },
+        {
+          "command": "jscratch.exportFile",
+          "when": "false"
+        },
+        {
+          "command": "jscratch.deleteNode",
+          "when": "false"
+        },
+        {
+          "command": "jscratch.reloadTypes",
+          "when": "false"
+        }
       ]
-    }
+    },
+    "viewsWelcome": [
+      {
+        "view": "jscratch.pipelineView",
+        "contents": "No active session.\n[New Session](command:jscratch.newSession)\nOr open the [Toolbox](command:jscratch.openToolbox) for quick dev utilities.",
+        "when": "!jscratch.hasSession"
+      },
+      {
+        "view": "jscratch.pipelineView",
+        "contents": "This session is empty.\n[Add Input](command:jscratch.addInput)",
+        "when": "jscratch.hasSession && jscratch.sessionEmpty"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "node esbuild.js --production",

@@ -7,8 +7,14 @@ import {
 import { Executor, defaultOutputFormat } from "./executor";
 import { typeDefForFile } from "./typeInference";
 import { transformTemplate, replaceTypeDefs } from "./templates";
-import { nextTransformName, validateFileName, sessionIdFromUri } from "./names";
-import { DataFormat, DATA_FORMATS } from "./formats";
+import {
+  nextTransformName,
+  validateFileName,
+  sessionIdFromUri,
+  uniqueName,
+} from "./names";
+import { DataFormat, DATA_FORMATS, guessFormat } from "./formats";
+import { addInputFile } from "./pipelineTree";
 import { log } from "../log";
 
 export interface PipelineDeps {
@@ -68,49 +74,110 @@ export function registerPipelineCommands(
     },
   );
 
-  let createInputCommand = vscode.commands.registerCommand(
-    "jscratch.createInput",
-    async () => {
-      if (!sessionManager.activeSessionId) {
-        vscode.window.showErrorMessage(
-          "No active session. Please create a session first.",
+  const addInput = async () => {
+    const sessionId = sessionManager.activeSessionId;
+    if (!sessionId) {
+      vscode.window.showErrorMessage(
+        "No active session. Please create a session first.",
+      );
+      return;
+    }
+
+    const picked = await vscode.window.showQuickPick(
+      [
+        { label: "$(new-file) Empty file…", id: "empty" },
+        { label: "$(clippy) From clipboard", id: "clipboard" },
+        { label: "$(folder-opened) From file…", id: "file" },
+        { label: "$(edit) From active editor", id: "editor" },
+      ],
+      { placeHolder: "Add an input to this session" },
+    );
+    if (!picked) {
+      return;
+    }
+
+    try {
+      const existing = async () =>
+        (await sessionManager.getMetadata(sessionId)).nodes.map(
+          (n) => n.filename,
         );
-        return;
-      }
-
-      const fileName = await vscode.window.showInputBox({
-        prompt: "Enter file name (e.g., data.json)",
-        placeHolder: "data.json",
-      });
-
-      if (!fileName) {
-        return;
-      }
-
-      try {
-        const sessionUri = sessionManager.getSessionUri(
-          sessionManager.activeSessionId,
-        );
-        const fileUri = vscode.Uri.joinPath(sessionUri, fileName);
-
-        // Create empty file
-        await vscode.workspace.fs.writeFile(fileUri, new Uint8Array());
-
-        // Update metadata
-        await sessionManager.addNode(sessionManager.activeSessionId, {
-          id: Date.now().toString(),
-          type: "input",
-          label: fileName,
-          filename: fileName,
+      const askName = async (value?: string) => {
+        const names = await existing();
+        return vscode.window.showInputBox({
+          prompt: "Enter file name (e.g., data.json)",
+          placeHolder: "data.json",
+          value,
+          validateInput: (v) => validateFileName(v, names),
         });
+      };
 
-        // Open file
-        const doc = await vscode.workspace.openTextDocument(fileUri);
-        await vscode.window.showTextDocument(doc);
-      } catch (error) {
-        vscode.window.showErrorMessage(`Failed to create input file: ${error}`);
+      let name: string | undefined;
+      let content: Uint8Array = new Uint8Array();
+      switch (picked.id) {
+        case "empty":
+          name = await askName();
+          break;
+        case "clipboard": {
+          const text = await vscode.env.clipboard.readText();
+          name = await askName(`input.${guessFormat(text)}`);
+          content = new TextEncoder().encode(text);
+          break;
+        }
+        case "file": {
+          const [src] =
+            (await vscode.window.showOpenDialog({
+              canSelectMany: false,
+              openLabel: "Add Input",
+            })) ?? [];
+          if (!src) {
+            return;
+          }
+          name = uniqueName(
+            src.path.split("/").pop() || "input.txt",
+            await existing(),
+          );
+          if (name === "pipeline.json") {
+            name = "pipeline-2.json";
+          }
+          content = await vscode.workspace.fs.readFile(src);
+          break;
+        }
+        case "editor": {
+          const editor = vscode.window.activeTextEditor;
+          if (!editor) {
+            vscode.window.showInformationMessage("No active editor");
+            return;
+          }
+          const text = editor.selection.isEmpty
+            ? editor.document.getText()
+            : editor.document.getText(editor.selection);
+          name = await askName(`input.${guessFormat(text)}`);
+          content = new TextEncoder().encode(text);
+          break;
+        }
       }
-    },
+      if (!name) {
+        return;
+      }
+
+      await addInputFile(sessionManager, sessionId, name, content);
+      const doc = await vscode.workspace.openTextDocument(
+        vscode.Uri.joinPath(sessionManager.getSessionUri(sessionId), name),
+      );
+      await vscode.window.showTextDocument(doc);
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to add input: ${error}`);
+    }
+  };
+
+  const addInputCommand = vscode.commands.registerCommand(
+    "jscratch.addInput",
+    addInput,
+  );
+  // Alias so old keybindings keep working
+  const createInputCommand = vscode.commands.registerCommand(
+    "jscratch.createInput",
+    addInput,
   );
 
   let addTransformCommand = vscode.commands.registerCommand(
@@ -412,6 +479,7 @@ export function registerPipelineCommands(
     newSessionCommand,
     loadSessionCommand,
     deleteSessionCommand,
+    addInputCommand,
     createInputCommand,
     addTransformCommand,
     runTransformCommand,

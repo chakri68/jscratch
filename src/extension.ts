@@ -6,6 +6,7 @@ import { HistoryTreeDataProvider } from "./etl/historyTree";
 import { Executor } from "./etl/executor";
 import { TransformCodeLensProvider } from "./etl/codeLens";
 import { registerPipelineCommands } from "./etl/commands";
+import { StatusDecorationProvider } from "./etl/statusDecorations";
 import { log } from "./log";
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -25,11 +26,15 @@ export async function activate(context: vscode.ExtensionContext) {
     context.globalState,
   );
 
-  const treeDataProvider = new PipelineTreeDataProvider(sessionManager);
+  const treeDataProvider = new PipelineTreeDataProvider(
+    sessionManager,
+    context.extensionUri,
+  );
   const pipelineTreeView = vscode.window.createTreeView(
     "jscratch.pipelineView",
     {
       treeDataProvider: treeDataProvider,
+      dragAndDropController: treeDataProvider,
     },
   );
 
@@ -39,18 +44,40 @@ export async function activate(context: vscode.ExtensionContext) {
     historyDataProvider,
   );
 
-  // Update view title when session changes
+  const decorations = new StatusDecorationProvider(sessionManager);
+  context.subscriptions.push(
+    vscode.window.registerFileDecorationProvider(decorations),
+    fileSystemProvider.onDidChangeFile(() =>
+      decorations.refreshSession(sessionManager.activeSessionId),
+    ),
+  );
+
+  // View title, welcome-view context keys and badges follow the active session
   sessionManager.onDidSessionChange(async () => {
-    if (sessionManager.activeSessionId) {
-      const metadata = await sessionManager.getMetadata(
-        sessionManager.activeSessionId,
-      );
-      pipelineTreeView.title = `Active Session: ${metadata.name || "Untitled"}`;
-      pipelineTreeView.message = undefined;
-    } else {
-      pipelineTreeView.title = "Active Session";
-      pipelineTreeView.message = "No active session";
+    const sessionId = sessionManager.activeSessionId;
+    let title = "Active Session";
+    let empty = false;
+    if (sessionId) {
+      try {
+        const metadata = await sessionManager.getMetadata(sessionId);
+        title = metadata.name || "Untitled";
+        empty = metadata.nodes.length === 0;
+      } catch (e) {
+        log.appendLine(`Failed to read session metadata: ${e}`);
+      }
     }
+    pipelineTreeView.title = title;
+    await vscode.commands.executeCommand(
+      "setContext",
+      "jscratch.hasSession",
+      !!sessionId,
+    );
+    await vscode.commands.executeCommand(
+      "setContext",
+      "jscratch.sessionEmpty",
+      empty,
+    );
+    await decorations.refreshSession(sessionId);
   });
 
   const executor = new Executor(sessionManager);

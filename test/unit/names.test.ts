@@ -4,6 +4,7 @@ import {
   nextTransformName,
   outputFilenameFor,
   sessionIdFromUri,
+  uniqueName,
   validateFileName,
 } from "../../src/etl/names";
 
@@ -65,4 +66,12 @@ test("sessionIdFromUri extracts the first path segment", () => {
   assert.equal(sessionIdFromUri({ path: "/" }), undefined);
   assert.equal(sessionIdFromUri({ path: "" }), undefined);
   assert.equal(sessionIdFromUri({ path: "/s1/sub/a.ts" }), "s1");
+});
+
+test("uniqueName leaves free names alone and suffixes collisions", () => {
+  assert.equal(uniqueName("a.json", ["b.json"]), "a.json");
+  assert.equal(uniqueName("a.json", ["a.json"]), "a-2.json");
+  assert.equal(uniqueName("a.json", ["a.json", "a-2.json"]), "a-3.json");
+  assert.equal(uniqueName("noext", ["noext"]), "noext-2");
+  assert.equal(uniqueName(".env", [".env"]), ".env-2");
 });
