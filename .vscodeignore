@@ -20,3 +20,4 @@ test/**
 media/*.svg
 !media/activity.svg
 !media/nodes/**
+out/src/**

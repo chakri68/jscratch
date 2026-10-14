@@ -445,7 +445,7 @@
     "watch": "node esbuild.js --watch",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js",
+    "test": "npm run compile && tsc -p tsconfig.test.json && node ./out/test/integration/runTest.js",
     "typecheck": "tsc --noEmit -p .",
     "test:unit": "tsx --test \"test/unit/**/*.test.ts\"",
     "icons": "node scripts/render-icon.mjs"

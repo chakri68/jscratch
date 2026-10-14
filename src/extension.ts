@@ -14,7 +14,17 @@ import { registerEditorActions } from "./toolbox/editorActions";
 import { registerPreview } from "./preview/previewPanel";
 import { log } from "./log";
 
-export async function activate(context: vscode.ExtensionContext) {
+/** Returned from `activate`. Test hooks: the integration suite drives these instead of UI prompts. */
+export interface JScratchApi {
+  readonly sessionManager: SessionManager;
+  readonly executor: Executor;
+  readonly storageUri: vscode.Uri;
+  readonly globalState: vscode.Memento;
+}
+
+export async function activate(
+  context: vscode.ExtensionContext,
+): Promise<JScratchApi> {
   context.subscriptions.push(log);
 
   const fileSystemProvider = new JScratchFileSystemProvider(
@@ -116,6 +126,13 @@ export async function activate(context: vscode.ExtensionContext) {
   } catch (e) {
     log.appendLine(`Failed to restore session: ${e}`);
   }
+
+  return {
+    sessionManager,
+    executor,
+    storageUri: context.globalStorageUri,
+    globalState: context.globalState,
+  };
 }
 
 export function deactivate() {}
