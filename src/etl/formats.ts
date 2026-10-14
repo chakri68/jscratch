@@ -2,6 +2,8 @@ import Papa from "papaparse";
 
 export type DataFormat = "json" | "csv" | "ndjson" | "txt";
 
+export const DATA_FORMATS: DataFormat[] = ["json", "csv", "ndjson", "txt"];
+
 const EXTENSIONS: Record<string, DataFormat> = {
   ".json": "json",
   ".csv": "csv",
@@ -119,7 +121,10 @@ export function guessFormat(text: string): DataFormat {
     // not json
   }
   const ls = lines(text).filter((l) => l.trim() !== "");
-  if (ls.length >= 2 && ls.filter((l) => l.includes(",")).length > ls.length / 2) {
+  if (
+    ls.length >= 2 &&
+    ls.filter((l) => l.includes(",")).length > ls.length / 2
+  ) {
     return "csv";
   }
   return "txt";
@@ -131,7 +136,9 @@ export function tabulate(
   if (!Array.isArray(data) || data.length === 0) {
     return undefined;
   }
-  if (data.every((r) => typeof r === "object" && r !== null && !Array.isArray(r))) {
+  if (
+    data.every((r) => typeof r === "object" && r !== null && !Array.isArray(r))
+  ) {
     const columns: string[] = [];
     const seen = new Set<string>();
     for (const r of data as Record<string, unknown>[]) {
@@ -150,7 +157,10 @@ export function tabulate(
     };
   }
   if (data.every((r) => Array.isArray(r))) {
-    const width = (data as unknown[][]).reduce((m, r) => Math.max(m, r.length), 0);
+    const width = (data as unknown[][]).reduce(
+      (m, r) => Math.max(m, r.length),
+      0,
+    );
     return {
       columns: Array.from({ length: width }, (_, i) => String(i + 1)),
       rows: data as unknown[][],

@@ -53,7 +53,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   });
 
-  const executor = new Executor(sessionManager, context.extensionUri);
+  const executor = new Executor(sessionManager);
   context.subscriptions.push(
     vscode.languages.registerCodeLensProvider(
       { scheme: "datalab", language: "typescript" },

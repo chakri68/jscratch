@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { SessionManager, PipelineNode } from "./sessionManager";
 import { runTransform } from "./runner";
-import { serialize, DataFormat } from "./formats";
+import { serialize, DataFormat, formatFromFilename } from "./formats";
 import { outputFilenameFor } from "./names";
 import { log } from "../log";
 
@@ -9,39 +9,69 @@ function firstLine(text: string | undefined): string {
   return (text ?? "").split(/\r?\n/).find((l) => l.trim()) ?? "Unknown error";
 }
 
+export function defaultOutputFormat(): DataFormat {
+  return vscode.workspace
+    .getConfiguration("jscratch.pipeline")
+    .get<DataFormat>("defaultOutputFormat", "json");
+}
+
+async function exists(uri: vscode.Uri): Promise<boolean> {
+  try {
+    await vscode.workspace.fs.stat(uri);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Flush unsaved editor changes so the run reads what's on screen. */
+async function saveIfDirty(uri: vscode.Uri): Promise<void> {
+  const doc = vscode.workspace.textDocuments.find(
+    (d) => d.uri.toString() === uri.toString(),
+  );
+  if (doc?.isDirty) {
+    await doc.save();
+  }
+}
+
 export class Executor {
   private running = new Set<string>();
 
-  constructor(
-    private sessionManager: SessionManager,
-    private extensionUri: vscode.Uri,
-  ) {}
+  constructor(private sessionManager: SessionManager) {}
 
-  /** Run one transform. Resolves true on success, false on any failure. */
+  /** Run one transform. Resolves true on success, false otherwise. Never rejects. */
   async run(node: PipelineNode): Promise<boolean> {
-    const sessionId = this.sessionManager.activeSessionId;
-    if (!sessionId) {
-      vscode.window.showErrorMessage("No active session");
-      return false;
-    }
-    // Re-read so format/filename changes made since the tree was rendered apply.
-    const current =
-      (await this.sessionManager.getNode(sessionId, node.id)) ?? node;
-    if (current.type !== "transform" || !current.parentId) {
-      vscode.window.showErrorMessage("Invalid transformation node");
-      return false;
-    }
-    if (this.running.has(current.id)) {
-      vscode.window.showInformationMessage(
-        `${current.filename} is already running`,
-      );
-      return false;
-    }
-    this.running.add(current.id);
     try {
-      return await this.runInner(sessionId, current);
-    } finally {
-      this.running.delete(current.id);
+      const sessionId = this.sessionManager.activeSessionId;
+      if (!sessionId) {
+        vscode.window.showErrorMessage("No active session");
+        return false;
+      }
+      // Re-read so format/filename changes made since the tree was rendered apply.
+      const current = await this.sessionManager.getNode(sessionId, node.id);
+      if (!current) {
+        log.appendLine(`[${node.filename}] node no longer exists`);
+        return false;
+      }
+      if (current.type !== "transform" || !current.parentId) {
+        vscode.window.showErrorMessage("Invalid transformation node");
+        return false;
+      }
+      if (this.running.has(current.id)) {
+        vscode.window.showInformationMessage(
+          `${current.filename} is already running`,
+        );
+        return false;
+      }
+      this.running.add(current.id);
+      try {
+        return await this.runInner(sessionId, current);
+      } finally {
+        this.running.delete(current.id);
+      }
+    } catch (e: any) {
+      log.appendLine(`[${node.filename}] unexpected error: ${e?.message ?? e}`);
+      return false;
     }
   }
 
@@ -65,9 +95,6 @@ export class Executor {
       for (const l of error.split(/\r?\n/)) {
         log.appendLine(`${tag} ${l}`);
       }
-      await this.sessionManager.updateNode(sessionId, node.id, {
-        lastRun: { at: Date.now(), ok: false, durationMs, error: line },
-      });
       void vscode.window
         .showErrorMessage(
           `Transform failed: ${line}`,
@@ -84,6 +111,13 @@ export class Executor {
             await vscode.window.showTextDocument(doc);
           }
         });
+      try {
+        await this.sessionManager.updateNode(sessionId, node.id, {
+          lastRun: { at: Date.now(), ok: false, durationMs, error: line },
+        });
+      } catch (e: any) {
+        log.appendLine(`${tag} could not record run: ${e?.message ?? e}`);
+      }
       return false;
     };
 
@@ -92,6 +126,8 @@ export class Executor {
     let scriptSource: string;
     try {
       const dec = new TextDecoder();
+      await saveIfDirty(vscode.Uri.joinPath(sessionUri, parentNode.filename));
+      await saveIfDirty(vscode.Uri.joinPath(sessionUri, node.filename));
       inputRaw = dec.decode(
         await vscode.workspace.fs.readFile(
           vscode.Uri.joinPath(sessionUri, parentNode.filename),
@@ -111,8 +147,7 @@ export class Executor {
 
     const cfg = vscode.workspace.getConfiguration("jscratch.pipeline");
     const timeoutMs = cfg.get<number>("timeoutMs", 60000);
-    const format: DataFormat =
-      node.outputFormat ?? cfg.get<DataFormat>("defaultOutputFormat", "json");
+    const format: DataFormat = node.outputFormat ?? defaultOutputFormat();
 
     const result = await vscode.window.withProgress(
       {
@@ -122,7 +157,7 @@ export class Executor {
       },
       (_progress, token) => {
         const ac = new AbortController();
-        token.onCancellationRequested(() => ac.abort());
+        const sub = token.onCancellationRequested(() => ac.abort());
         return runTransform({
           scriptSource,
           inputFilename: parentNode.filename,
@@ -130,12 +165,16 @@ export class Executor {
           timeoutMs,
           signal: ac.signal,
           onLog: (line) => log.appendLine(`${tag} ${line}`),
-        });
+        }).finally(() => sub.dispose());
       },
     );
 
     if (result.parseWarning) {
       log.appendLine(`${tag} warning: ${result.parseWarning}`);
+    }
+    if (!result.ok && result.error === "Cancelled") {
+      log.appendLine(`${tag} cancelled`);
+      return false;
     }
     if (!result.ok) {
       return fail(result.error ?? "Unknown error", result.durationMs);
@@ -157,16 +196,36 @@ export class Executor {
 
       if (existing) {
         let outName = existing.filename;
-        if (extOf(existing.filename) !== format) {
+        if (formatFromFilename(existing.filename) !== format) {
+          const target = vscode.Uri.joinPath(sessionUri, wantedName);
+          if (await exists(target)) {
+            return fail(
+              `Could not switch output to ${format}: ${wantedName} already exists`,
+              result.durationMs,
+            );
+          }
           await vscode.workspace.fs.rename(
             vscode.Uri.joinPath(sessionUri, existing.filename),
             vscode.Uri.joinPath(sessionUri, wantedName),
             { overwrite: false },
           );
-          await this.sessionManager.updateNode(sessionId, existing.id, {
-            filename: wantedName,
-            label: wantedName,
-          });
+          try {
+            await this.sessionManager.updateNode(sessionId, existing.id, {
+              filename: wantedName,
+              label: wantedName,
+            });
+          } catch (err) {
+            await vscode.workspace.fs
+              .rename(
+                target,
+                vscode.Uri.joinPath(sessionUri, existing.filename),
+                {
+                  overwrite: false,
+                },
+              )
+              .then(undefined, () => undefined);
+            throw err;
+          }
           outName = wantedName;
         }
         outputUri = vscode.Uri.joinPath(sessionUri, outName);
@@ -195,9 +254,13 @@ export class Executor {
       );
     }
 
-    await this.sessionManager.updateNode(sessionId, node.id, {
-      lastRun: { at: Date.now(), ok: true, durationMs: result.durationMs },
-    });
+    try {
+      await this.sessionManager.updateNode(sessionId, node.id, {
+        lastRun: { at: Date.now(), ok: true, durationMs: result.durationMs },
+      });
+    } catch (e: any) {
+      log.appendLine(`${tag} could not record run: ${e?.message ?? e}`);
+    }
 
     try {
       const doc = await vscode.workspace.openTextDocument(outputUri);
@@ -229,9 +292,4 @@ export class Executor {
       queue.push(...(await this.sessionManager.children(sessionId, next.id)));
     }
   }
-}
-
-function extOf(filename: string): string {
-  const i = filename.lastIndexOf(".");
-  return i < 0 ? "" : filename.slice(i + 1).toLowerCase();
 }

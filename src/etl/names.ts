@@ -36,3 +36,8 @@ export function outputFilenameFor(
 ): string {
   return `${transformFilename.replace(/\.ts$/, "")}.out.${format}`;
 }
+
+/** Session id of a `datalab:/<session>/<file>` uri path. */
+export function sessionIdFromUri(uri: { path: string }): string | undefined {
+  return uri.path.split("/")[1] || undefined;
+}

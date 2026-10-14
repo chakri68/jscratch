@@ -4,22 +4,16 @@ import {
   PipelineNode,
   SessionMetadata,
 } from "./sessionManager";
-import { Executor } from "./executor";
+import { Executor, defaultOutputFormat } from "./executor";
 import { typeDefForFile } from "./typeInference";
 import { transformTemplate, replaceTypeDefs } from "./templates";
-import { nextTransformName, validateFileName } from "./names";
-import type { DataFormat } from "./formats";
+import { nextTransformName, validateFileName, sessionIdFromUri } from "./names";
+import { DataFormat, DATA_FORMATS } from "./formats";
 import { log } from "../log";
 
 export interface PipelineDeps {
   sessionManager: SessionManager;
   executor: Executor;
-}
-
-function defaultFormat(): DataFormat {
-  return vscode.workspace
-    .getConfiguration("jscratch.pipeline")
-    .get<DataFormat>("defaultOutputFormat", "json");
 }
 
 export function registerPipelineCommands(
@@ -191,6 +185,12 @@ export function registerPipelineCommands(
     }
     let node: PipelineNode | undefined;
     if (target instanceof vscode.Uri) {
+      if (sessionIdFromUri(target) !== sessionId) {
+        vscode.window.showWarningMessage(
+          "That script belongs to another session. Open that session first.",
+        );
+        return undefined;
+      }
       const filename = target.path.split("/").pop();
       const metadata = await sessionManager.getMetadata(sessionId);
       node = metadata.nodes.find((n) => n.filename === filename);
@@ -224,7 +224,6 @@ export function registerPipelineCommands(
     },
   );
 
-  const formats: DataFormat[] = ["json", "csv", "ndjson", "txt"];
   let setOutputFormatCommand = vscode.commands.registerCommand(
     "jscratch.setOutputFormat",
     async (node: PipelineNode) => {
@@ -232,9 +231,9 @@ export function registerPipelineCommands(
       if (!sessionId || !node) {
         return;
       }
-      const current = node.outputFormat ?? defaultFormat();
+      const current = node.outputFormat ?? defaultOutputFormat();
       const picked = await vscode.window.showQuickPick(
-        formats.map((f) => ({
+        DATA_FORMATS.map((f) => ({
           label: f,
           description: f === current ? "current" : undefined,
         })),
@@ -259,7 +258,7 @@ export function registerPipelineCommands(
       return;
     }
     const sessionId = sessionManager.activeSessionId;
-    if (!sessionId || doc.uri.path.split("/")[1] !== sessionId) {
+    if (!sessionId || sessionIdFromUri(doc.uri) !== sessionId) {
       return;
     }
     const filename = doc.uri.path.split("/").pop();
