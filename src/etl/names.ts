@@ -57,3 +57,8 @@ export function uniqueName(name: string, existing: string[]): string {
     }
   }
 }
+
+/** Collision-free input filename; also steers clear of the reserved pipeline.json. */
+export function safeInputName(base: string, existing: string[]): string {
+  return uniqueName(base, [...existing, "pipeline.json"]);
+}

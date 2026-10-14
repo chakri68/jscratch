@@ -11,10 +11,10 @@ import {
   nextTransformName,
   validateFileName,
   sessionIdFromUri,
-  uniqueName,
+  safeInputName,
 } from "./names";
 import { DataFormat, DATA_FORMATS, guessFormat } from "./formats";
-import { addInputFile } from "./pipelineTree";
+import { addInputFile } from "./inputs";
 import { log } from "../log";
 
 export interface PipelineDeps {
@@ -132,13 +132,10 @@ export function registerPipelineCommands(
           if (!src) {
             return;
           }
-          name = uniqueName(
+          name = safeInputName(
             src.path.split("/").pop() || "input.txt",
             await existing(),
           );
-          if (name === "pipeline.json") {
-            name = "pipeline-2.json";
-          }
           content = await vscode.workspace.fs.readFile(src);
           break;
         }

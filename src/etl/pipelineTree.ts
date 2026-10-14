@@ -1,32 +1,11 @@
 import * as vscode from "vscode";
 import { SessionManager, PipelineNode } from "./sessionManager";
 import { parse } from "./formats";
-import { uniqueName } from "./names";
+import { safeInputName } from "./names";
+import { addInputFile } from "./inputs";
 
 /** Skip row counting for files at or above this size. */
 const COUNT_LIMIT_BYTES = 5 * 1024 * 1024;
-
-/** Copy bytes into the session as a new input node. Returns the node. */
-export async function addInputFile(
-  sessionManager: SessionManager,
-  sessionId: string,
-  filename: string,
-  content: Uint8Array,
-): Promise<PipelineNode> {
-  const sessionUri = sessionManager.getSessionUri(sessionId);
-  await vscode.workspace.fs.writeFile(
-    vscode.Uri.joinPath(sessionUri, filename),
-    content,
-  );
-  const node: PipelineNode = {
-    id: `${Date.now()}${Math.floor(Math.random() * 1000)}`,
-    type: "input",
-    label: filename,
-    filename,
-  };
-  await sessionManager.addNode(sessionId, node);
-  return node;
-}
 
 export class PipelineTreeDataProvider
   implements
@@ -41,8 +20,11 @@ export class PipelineTreeDataProvider
   >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-  /** Row counts keyed by `uri@mtime`, so unchanged files aren't re-parsed on refresh. */
-  private rowCounts = new Map<string, string | undefined>();
+  /** Row counts keyed by uri, invalidated by mtime, so unchanged files aren't re-parsed on refresh. */
+  private rowCounts = new Map<
+    string,
+    { mtime: number; count: string | undefined }
+  >();
 
   constructor(
     private sessionManager: SessionManager,
@@ -99,7 +81,10 @@ export class PipelineTreeDataProvider
   ): Promise<string | undefined> {
     if (node.type === "transform") {
       const ms = node.lastRun?.durationMs;
-      return ms === undefined ? undefined : `${(ms / 1000).toFixed(1)}s`;
+      if (ms === undefined) {
+        return undefined;
+      }
+      return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`;
     }
     if (node.type !== "output") {
       return undefined;
@@ -109,20 +94,20 @@ export class PipelineTreeDataProvider
       if (stat.size >= COUNT_LIMIT_BYTES) {
         return undefined;
       }
-      const key = `${uri.toString()}@${stat.mtime}`;
-      if (!this.rowCounts.has(key)) {
-        const raw = new TextDecoder().decode(
-          await vscode.workspace.fs.readFile(uri),
-        );
-        const { data } = parse(node.filename, raw);
-        this.rowCounts.set(
-          key,
-          Array.isArray(data)
-            ? `${data.length.toLocaleString("en-US")} rows`
-            : undefined,
-        );
+      const key = uri.toString();
+      const hit = this.rowCounts.get(key);
+      if (hit && hit.mtime === stat.mtime) {
+        return hit.count;
       }
-      return this.rowCounts.get(key);
+      const raw = new TextDecoder().decode(
+        await vscode.workspace.fs.readFile(uri),
+      );
+      const { data } = parse(node.filename, raw);
+      const count = Array.isArray(data)
+        ? `${data.length.toLocaleString()} ${data.length === 1 ? "row" : "rows"}`
+        : undefined;
+      this.rowCounts.set(key, { mtime: stat.mtime, count });
+      return count;
     } catch {
       return undefined;
     }
@@ -153,6 +138,15 @@ export class PipelineTreeDataProvider
       .filter((l) => l && !l.startsWith("#"))
       .map((l) => vscode.Uri.parse(l))
       .filter((u) => u.scheme === "file");
+    const all = list
+      .split(/\r?\n/)
+      .filter((l) => l.trim() && !l.startsWith("#"));
+    const skipped = all.length - uris.length;
+    if (skipped > 0) {
+      vscode.window.showInformationMessage(
+        `Skipped ${skipped} item(s) that aren't local files`,
+      );
+    }
     for (const uri of uris) {
       try {
         const stat = await vscode.workspace.fs.stat(uri);
@@ -163,10 +157,7 @@ export class PipelineTreeDataProvider
           await this.sessionManager.getMetadata(sessionId)
         ).nodes.map((n) => n.filename);
         const base = uri.path.split("/").pop() || "input.txt";
-        const name = uniqueName(
-          base === "pipeline.json" ? "pipeline-2.json" : base,
-          existing,
-        );
+        const name = safeInputName(base, existing);
         await addInputFile(
           this.sessionManager,
           sessionId,

@@ -5,6 +5,7 @@ import {
   outputFilenameFor,
   sessionIdFromUri,
   uniqueName,
+  safeInputName,
   validateFileName,
 } from "../../src/etl/names";
 
@@ -74,4 +75,12 @@ test("uniqueName leaves free names alone and suffixes collisions", () => {
   assert.equal(uniqueName("a.json", ["a.json", "a-2.json"]), "a-3.json");
   assert.equal(uniqueName("noext", ["noext"]), "noext-2");
   assert.equal(uniqueName(".env", [".env"]), ".env-2");
+});
+
+test("safeInputName avoids the reserved name and collisions", () => {
+  assert.equal(
+    safeInputName("pipeline.json", ["pipeline-2.json"]),
+    "pipeline-3.json",
+  );
+  assert.equal(safeInputName("data.json", ["data.json"]), "data-2.json");
 });

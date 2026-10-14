@@ -53,7 +53,9 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   // View title, welcome-view context keys and badges follow the active session
+  let changeSeq = 0;
   sessionManager.onDidSessionChange(async () => {
+    const seq = ++changeSeq;
     const sessionId = sessionManager.activeSessionId;
     let title = "Active Session";
     let empty = false;
@@ -65,6 +67,9 @@ export async function activate(context: vscode.ExtensionContext) {
       } catch (e) {
         log.appendLine(`Failed to read session metadata: ${e}`);
       }
+    }
+    if (seq !== changeSeq) {
+      return; // a newer change superseded this one
     }
     pipelineTreeView.title = title;
     await vscode.commands.executeCommand(

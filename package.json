@@ -83,7 +83,8 @@
       {
         "command": "jscratch.loadSession",
         "title": "Load Session",
-        "category": "JScratch"
+        "category": "JScratch",
+        "icon": "$(folder-opened)"
       },
       {
         "command": "jscratch.deleteSession",
@@ -148,7 +149,8 @@
       {
         "command": "jscratch.createInput",
         "title": "Add Input (alias)",
-        "category": "JScratch"
+        "category": "JScratch",
+        "icon": "$(add)"
       }
     ],
     "menus": {
@@ -173,17 +175,17 @@
         {
           "command": "jscratch.addTransform",
           "when": "view == jscratch.pipelineView && viewItem == input",
-          "group": "inline"
+          "group": "inline@1"
         },
         {
           "command": "jscratch.addTransform",
           "when": "view == jscratch.pipelineView && viewItem == output",
-          "group": "inline"
+          "group": "inline@1"
         },
         {
           "command": "jscratch.exportFile",
           "when": "view == jscratch.pipelineView && (viewItem == input || viewItem == output)",
-          "group": "inline"
+          "group": "inline@2"
         },
         {
           "command": "jscratch.deleteSession",
@@ -193,22 +195,22 @@
         {
           "command": "jscratch.deleteNode",
           "when": "view == jscratch.pipelineView && viewItem == transform",
-          "group": "inline"
+          "group": "inline@9"
         },
         {
           "command": "jscratch.reloadTypes",
           "when": "view == jscratch.pipelineView && viewItem == transform",
-          "group": "inline"
+          "group": "inline@3"
         },
         {
           "command": "jscratch.runTransform",
           "when": "view == jscratch.pipelineView && viewItem == transform",
-          "group": "inline"
+          "group": "inline@1"
         },
         {
           "command": "jscratch.runBranch",
           "when": "view == jscratch.pipelineView && viewItem == transform",
-          "group": "inline"
+          "group": "inline@2"
         },
         {
           "command": "jscratch.setOutputFormat",
