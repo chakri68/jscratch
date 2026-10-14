@@ -28,7 +28,6 @@ export async function activate(context: vscode.ExtensionContext) {
     context.globalStorageUri,
     context.globalState,
   );
-  await sessionManager.restore();
 
   const treeDataProvider = new PipelineTreeDataProvider(sessionManager);
   const pipelineTreeView = vscode.window.createTreeView(
@@ -57,6 +56,9 @@ export async function activate(context: vscode.ExtensionContext) {
       pipelineTreeView.message = "No active session";
     }
   });
+
+  // Listeners are registered above; restore fires onDidSessionChange.
+  await sessionManager.restore();
 
   const executor = new Executor(sessionManager, context.extensionUri);
   context.subscriptions.push(
