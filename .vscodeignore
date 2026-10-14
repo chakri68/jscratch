@@ -5,6 +5,7 @@ src/**
 .eslintrc.json
 .eslintignore
 tsconfig.json
+tsconfig.test.json
 pnpm-lock.yaml
 REQUIREMENTS.md
 vsc-extension-quickstart.md
@@ -21,3 +22,5 @@ media/*.svg
 !media/activity.svg
 !media/nodes/**
 out/src/**
+esbuild.js
+.github/**

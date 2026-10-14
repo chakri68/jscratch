@@ -2,17 +2,30 @@
   "name": "jscratch",
   "displayName": "JScratch",
   "icon": "media/icon.png",
-  "description": "In-Editor ETL Scratchpad",
+  "description": "ETL scratchpad and offline dev toolbox for VS Code",
   "publisher": "chakri68",
   "repository": {
     "url": "https://github.com/chakri68/jscratch/"
   },
-  "version": "0.0.4",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
+    "Data Science",
+    "Formatters",
     "Other"
+  ],
+  "keywords": [
+    "etl",
+    "json",
+    "csv",
+    "base64",
+    "jwt",
+    "uuid",
+    "regex",
+    "yaml",
+    "toolbox"
   ],
   "activationEvents": [
     "onFileSystem:datalab"
