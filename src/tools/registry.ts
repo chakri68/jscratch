@@ -1,4 +1,5 @@
 import type { Tool, ToolResult } from "./types";
+import { toolMatches } from "./search";
 import { base64 } from "./encode/base64";
 import { url } from "./encode/url";
 import { html } from "./encode/html";
@@ -53,13 +54,7 @@ export function resolveTool(id: string | undefined): Tool {
 }
 
 export function searchTools(q: string): Tool[] {
-  const needle = q.trim().toLowerCase();
-  if (!needle) {
-    return [...TOOLS];
-  }
-  return TOOLS.filter((t) =>
-    [t.title, t.id, ...(t.keywords ?? [])].some((s) => s.toLowerCase().includes(needle)),
-  );
+  return TOOLS.filter((t) => toolMatches(t, q));
 }
 
 export function runTool(
@@ -80,7 +75,12 @@ export function runTool(
   for (const o of tool.options ?? []) {
     merged[o.id] = o.default;
   }
-  Object.assign(merged, options);
+  // An explicit `undefined` means "not set", so it must not clobber the default.
+  for (const [k, v] of Object.entries(options)) {
+    if (v !== undefined) {
+      merged[k] = v;
+    }
+  }
   try {
     return tool.run(fields, merged);
   } catch (e) {

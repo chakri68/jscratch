@@ -135,6 +135,12 @@
         "icon": "$(clear-all)"
       },
       {
+        "command": "jscratch.openToolbox",
+        "title": "Open Toolbox",
+        "category": "JScratch",
+        "icon": "$(tools)"
+      },
+      {
         "command": "jscratch.deleteNode",
         "title": "Delete",
         "category": "JScratch",

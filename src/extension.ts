@@ -7,6 +7,7 @@ import { Executor } from "./etl/executor";
 import { TransformCodeLensProvider } from "./etl/codeLens";
 import { registerPipelineCommands } from "./etl/commands";
 import { StatusDecorationProvider } from "./etl/statusDecorations";
+import { registerToolbox } from "./toolbox/toolboxPanel";
 import { log } from "./log";
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -94,6 +95,7 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   registerPipelineCommands(context, { sessionManager, executor });
+  registerToolbox(context, sessionManager);
 
   // Commands are live before this runs, so a failed restore can't take them down.
   // Listeners are registered above; restore fires onDidSessionChange.

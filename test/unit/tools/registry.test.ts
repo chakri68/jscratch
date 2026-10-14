@@ -52,3 +52,12 @@ test("a throwing tool becomes ok:false", async () => {
     tools.pop();
   }
 });
+
+test("runTool ignores undefined option values instead of overriding defaults", () => {
+  const fields = { input: "abc" };
+  assert.deepEqual(runTool("hash", fields, { algorithm: undefined }), runTool("hash", fields));
+  assert.deepEqual(
+    runTool("json-format", { input: '{"a":1}' }, { style: undefined, indent: undefined }),
+    runTool("json-format", { input: '{"a":1}' }),
+  );
+});
