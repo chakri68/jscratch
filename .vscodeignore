@@ -10,3 +10,13 @@ REQUIREMENTS.md
 vsc-extension-quickstart.md
 **/*.map
 out/test/**
+node_modules/**
+!node_modules/esbuild/**
+!node_modules/@esbuild/**
+docs/**
+scripts/**
+test/**
+.superpowers/**
+media/*.svg
+!media/activity.svg
+!media/nodes/**

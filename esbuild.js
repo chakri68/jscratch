@@ -1,4 +1,5 @@
 const esbuild = require("esbuild");
+const fs = require("fs");
 
 const production = process.argv.includes("--production");
 const watch = process.argv.includes("--watch");
@@ -24,6 +25,23 @@ const esbuildProblemMatcherPlugin = {
   },
 };
 
+/** Copies static webview assets next to the bundles. */
+const copyWebviewAssets = {
+  name: "copy-webview-assets",
+  setup(build) {
+    build.onEnd(() => {
+      fs.mkdirSync("out/webview", { recursive: true });
+      for (const [from, to] of [
+        ["node_modules/@vscode/codicons/dist/codicon.css", "codicon.css"],
+        ["node_modules/@vscode/codicons/dist/codicon.ttf", "codicon.ttf"],
+        ["src/webview/styles.css", "styles.css"],
+      ]) {
+        fs.copyFileSync(from, `out/webview/${to}`);
+      }
+    });
+  },
+};
+
 async function main() {
   const ctx = await esbuild.context({
     entryPoints: ["src/extension.ts"],
@@ -42,11 +60,26 @@ async function main() {
     ],
   });
 
+  const webCtx = await esbuild.context({
+    entryPoints: ["src/webview/toolbox.ts", "src/webview/preview.ts"],
+    bundle: true,
+    format: "iife",
+    minify: production,
+    sourcemap: !production,
+    sourcesContent: false,
+    platform: "browser",
+    outdir: "out/webview",
+    logLevel: "silent",
+    plugins: [copyWebviewAssets, esbuildProblemMatcherPlugin],
+  });
+
   if (watch) {
-    await ctx.watch();
+    await Promise.all([ctx.watch(), webCtx.watch()]);
   } else {
     await ctx.rebuild();
+    await webCtx.rebuild();
     await ctx.dispose();
+    await webCtx.dispose();
   }
 }
 
