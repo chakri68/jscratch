@@ -153,3 +153,14 @@ test("flushes partial last line", async () => {
 test("no temp dir leak", () => {
   assert.ok(tmpCount() <= before);
 });
+
+test("stack traces point at userTransform.ts lines", async () => {
+  const r = await runTransform({
+    scriptSource: `export function transform() {\n  const x = 1;\n  throw new Error("line three");\n}\n`,
+    inputFilename: "in.json",
+    inputRaw: "[]",
+    timeoutMs: 10000,
+  });
+  assert.ok(!r.ok);
+  assert.match(r.error!, /userTransform\.ts:3/);
+});

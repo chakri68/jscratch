@@ -40,7 +40,7 @@ hit **Reload Types** on old transforms so the `TYPE DEFS` block picks up the rea
 - **CSV parsing** (see the breaking note above).
 - the pipeline renders as a real nested tree instead of a flat list.
 - transforms run in a separate Node process (VS Code's own binary) with a configurable timeout. logs stream live to the **JScratch** output channel, prefixed with the script name.
-- **Add Transformation** always creates a new transform instead of reopening the existing one. the name prompt is prefilled with `transform-N.ts`.
+- **Add Transform** always creates a new transform instead of reopening the existing one. the name prompt is prefilled with `transform-N.ts`.
 - new outputs are named `<transform>.out.<ext>`. old `output-<ts>.json` files keep their names.
 - outputs open beside the editor without stealing focus.
 - the transform template notes that `console.log` is safe.

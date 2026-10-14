@@ -1,14 +1,5 @@
 import type { Tool } from "../types";
-
-function span(secs: number): string {
-  const units: [string, number][] = [["d", 86400], ["h", 3600], ["m", 60], ["s", 1]];
-  for (const [u, n] of units) {
-    if (secs >= n) {
-      return `${Math.floor(secs / n)}${u}`;
-    }
-  }
-  return "0s";
-}
+import { span } from "../util";
 
 function relative(ms: number): string {
   const diff = Math.trunc((ms - Date.now()) / 1000);

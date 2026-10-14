@@ -72,6 +72,8 @@ function save(): void {
 // --- tabular ----------------------------------------------------------------
 
 function showData(msg: Data): void {
+  // Fresh data supersedes whatever failed last time.
+  app.querySelector(".pv-error")?.remove();
   data = msg;
   hay = haystacks(msg.rows);
   const col = state.sort ? msg.columns.indexOf(state.sort.name) : -1;

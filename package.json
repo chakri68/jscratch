@@ -117,7 +117,7 @@
       },
       {
         "command": "jscratch.addTransform",
-        "title": "Add Transformation",
+        "title": "Add Transform",
         "category": "JScratch",
         "icon": "$(beaker)"
       },
@@ -283,6 +283,16 @@
           "group": "inline@9"
         },
         {
+          "command": "jscratch.deleteNode",
+          "when": "view == jscratch.pipelineView && viewItem == input",
+          "group": "9_delete"
+        },
+        {
+          "command": "jscratch.deleteNode",
+          "when": "view == jscratch.pipelineView && viewItem == output",
+          "group": "9_delete"
+        },
+        {
           "command": "jscratch.reloadTypes",
           "when": "view == jscratch.pipelineView && viewItem == transform",
           "group": "inline@3"
@@ -374,7 +384,11 @@
         },
         {
           "command": "jscratch.preview",
-          "when": "resourceSet"
+          "when": "resourceExtname =~ /\\.(json|csv|jsonl|ndjson|txt)$/"
+        },
+        {
+          "command": "jscratch.runTransform",
+          "when": "resourceScheme == datalab && resourceExtname == .ts"
         }
       ],
       "editor/context": [

@@ -25,7 +25,7 @@ export class TransformCodeLensProvider implements vscode.CodeLensProvider {
     const range = new vscode.Range(line, 0, line, 0);
     const lenses = [
       new vscode.CodeLens(range, {
-        title: "▶ Run Transformation",
+        title: "▶ Run Transform",
         command: "jscratch.runTransform",
         arguments: [document.uri],
       }),

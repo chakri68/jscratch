@@ -17,7 +17,7 @@ the two talk to each other: any tool output can be sent into the active session 
 
 1. click the JScratch icon in the activity bar, then **New Session**.
 2. **Add Input** and pick a source: an empty file, the clipboard, a file from disk, or the active editor (selection, or the whole doc if nothing's selected). you can also drag files from the OS or explorer onto the tree.
-3. hover the input and hit **Add Transformation**. JScratch infers a type from the input's data and generates a script. for a `people.csv` with `name,city,age` headers, you get:
+3. hover the input and hit **Add Transform**. JScratch infers a type from the input's data and generates a script. for a `people.csv` with `name,city,age` headers, you get:
 
    ```ts
    import * as path from 'path';
@@ -152,7 +152,7 @@ in the command palette:
 | `JScratch: Open Tool…` | the launcher (`Ctrl+Alt+J` / `Cmd+Alt+J`) |
 | `JScratch: Clear History` | delete all saved sessions |
 
-on tree nodes: **Add Transformation**, **Run Branch**, **Reload Types**, **Set Output Format**, **Export File**, **Preview**, **Delete**. in History: click a session to load it, trash icon to delete.
+on tree nodes: **Add Transform**, **Run Branch**, **Reload Types**, **Set Output Format**, **Export File**, **Preview**, **Delete**. in History: click a session to load it, trash icon to delete.
 
 ## Requirements
 

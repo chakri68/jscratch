@@ -52,11 +52,14 @@ export async function activate(
       dragAndDropController: treeDataProvider,
     },
   );
+  context.subscriptions.push(pipelineTreeView);
 
   const historyDataProvider = new HistoryTreeDataProvider(sessionManager);
-  vscode.window.registerTreeDataProvider(
-    "jscratch.historyView",
-    historyDataProvider,
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider(
+      "jscratch.historyView",
+      historyDataProvider,
+    ),
   );
 
   const decorations = new StatusDecorationProvider(sessionManager);
@@ -69,7 +72,7 @@ export async function activate(
 
   // View title, welcome-view context keys and badges follow the active session
   let changeSeq = 0;
-  sessionManager.onDidSessionChange(async () => {
+  const onSessionChange = sessionManager.onDidSessionChange(async () => {
     const seq = ++changeSeq;
     const sessionId = sessionManager.activeSessionId;
     let title = "Active Session";
@@ -99,6 +102,7 @@ export async function activate(
     );
     await decorations.refreshSession(sessionId);
   });
+  context.subscriptions.push(onSessionChange);
 
   const executor = new Executor(sessionManager);
   context.subscriptions.push(

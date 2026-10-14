@@ -20,7 +20,7 @@ export function inferType(value: unknown, indent = ""): string {
       .map((key) => {
         const keyStr = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key)
           ? key
-          : `"${key}"`;
+          : JSON.stringify(key);
         return `${indent}    ${keyStr}: ${inferType(
           obj[key],
           indent + "    ",

@@ -1,4 +1,5 @@
 import type { Tool } from "../types";
+import { clampInt } from "../util";
 
 export function parseJson(input: string): unknown {
   try {
@@ -53,7 +54,7 @@ export const jsonFormat: Tool = {
     if (sortKeys) {
       v = sortDeep(v);
     }
-    const n = Math.min(10, Math.max(0, Math.floor(Number(indent)) || 0));
+    const n = clampInt(indent, 0, 10, 0);
     return {
       ok: true,
       output: JSON.stringify(v, null, style === "minify" ? 0 : n),

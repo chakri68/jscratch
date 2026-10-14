@@ -18,8 +18,9 @@ export class ToolboxTreeDataProvider implements vscode.TreeDataProvider<Node> {
     const item = new vscode.TreeItem(tool.title, vscode.TreeItemCollapsibleState.None);
     item.id = `tool:${tool.id}`;
     item.iconPath = new vscode.ThemeIcon(tool.icon);
+    // openToolbox, not the launcher: a sidebar click shouldn't slurp the editor selection.
     item.command = {
-      command: "jscratch.openTool",
+      command: "jscratch.openToolbox",
       title: "Open Tool",
       arguments: [tool.id],
     };

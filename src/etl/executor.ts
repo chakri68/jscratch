@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { SessionManager, PipelineNode } from "./sessionManager";
 import { runTransform } from "./runner";
 import { serialize, DataFormat, formatFromFilename } from "./formats";
-import { outputFilenameFor } from "./names";
+import { effectiveFormat, outputFilenameFor } from "./names";
 import { log } from "../log";
 
 function firstLine(text: string | undefined): string {
@@ -38,6 +38,10 @@ export class Executor {
   private running = new Set<string>();
 
   constructor(private sessionManager: SessionManager) {}
+
+  isRunning(nodeId: string): boolean {
+    return this.running.has(nodeId);
+  }
 
   /** Run one transform. Resolves true on success, false otherwise. Never rejects. */
   async run(node: PipelineNode): Promise<boolean> {
@@ -147,7 +151,7 @@ export class Executor {
 
     const cfg = vscode.workspace.getConfiguration("jscratch.pipeline");
     const timeoutMs = cfg.get<number>("timeoutMs", 60000);
-    const format: DataFormat = node.outputFormat ?? defaultOutputFormat();
+    const format = effectiveFormat(node);
 
     const result = await vscode.window.withProgress(
       {

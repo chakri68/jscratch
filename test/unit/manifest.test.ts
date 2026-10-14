@@ -50,3 +50,20 @@ test("jscratch.preview is on input/output nodes, the editor title, and the palet
   assert.ok(title?.when.includes("resourceScheme == datalab"));
   assert.equal(commands.find((c) => c.command === "jscratch.preview")?.title, "Preview Current File");
 });
+
+test("inputs and outputs can be deleted from the context menu", () => {
+  const ctx = pkg.contributes.menus["view/item/context"].filter(
+    (m: { command: string }) => m.command === "jscratch.deleteNode",
+  );
+  for (const kind of ["input", "output"]) {
+    const entry = ctx.find((m: { when: string }) => m.when.endsWith(`viewItem == ${kind}`));
+    assert.equal(entry?.group, "9_delete");
+  }
+});
+
+test("palette gates Run Current Transform and Preview Current File", () => {
+  const palette = pkg.contributes.menus.commandPalette;
+  const when = (id: string) => palette.find((m: { command: string }) => m.command === id)?.when;
+  assert.equal(when("jscratch.runTransform"), "resourceScheme == datalab && resourceExtname == .ts");
+  assert.equal(when("jscratch.preview"), "resourceExtname =~ /\\.(json|csv|jsonl|ndjson|txt)$/");
+});

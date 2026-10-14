@@ -12,6 +12,7 @@ import {
   validateFileName,
   sessionIdFromUri,
   safeInputName,
+  effectiveFormat,
 } from "./names";
 import { DataFormat, DATA_FORMATS, guessFormat } from "./formats";
 import { addInputFile } from "./inputs";
@@ -225,6 +226,8 @@ export function registerPipelineCommands(
           label: transformFilename,
           filename: transformFilename,
           parentId: node.id,
+          // Stamped now so changing the setting later doesn't rewrite old transforms.
+          outputFormat: defaultOutputFormat(),
         });
 
         const doc = await vscode.workspace.openTextDocument(transformUri);
@@ -295,7 +298,7 @@ export function registerPipelineCommands(
       if (!sessionId || !node) {
         return;
       }
-      const current = node.outputFormat ?? defaultOutputFormat();
+      const current = effectiveFormat(node);
       const picked = await vscode.window.showQuickPick(
         DATA_FORMATS.map((f) => ({
           label: f,
@@ -328,7 +331,8 @@ export function registerPipelineCommands(
     const filename = doc.uri.path.split("/").pop();
     const metadata = await sessionManager.getMetadata(sessionId);
     const node = metadata.nodes.find((n) => n.filename === filename);
-    if (node && node.type === "transform") {
+    // Our own saveIfDirty mid-run lands here too; skip it quietly.
+    if (node && node.type === "transform" && !executor.isRunning(node.id)) {
       await executor.run(node);
     }
   });
@@ -389,7 +393,7 @@ export function registerPipelineCommands(
       }
 
       const answer = await vscode.window.showWarningMessage(
-        `Are you sure you want to delete '${node.label}'? All subsequent nodes will also be deleted.`,
+        `Delete '${node.label}' and everything downstream?`,
         "Yes",
         "No",
       );

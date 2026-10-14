@@ -8,6 +8,7 @@ import {
   safeInputName,
   classifyDropUris,
   validateFileName,
+  effectiveFormat,
 } from "../../src/etl/names";
 
 test("validateFileName accepts a fresh name", () => {
@@ -102,4 +103,9 @@ test("classifyDropUris: file kept, datalab ignored, others skipped", () => {
     files: ["file:///a.txt"],
     skipped: 0,
   });
+});
+
+test("effectiveFormat: missing outputFormat is json, set one wins", () => {
+  assert.equal(effectiveFormat({}), "json");
+  assert.equal(effectiveFormat({ outputFormat: "csv" }), "csv");
 });

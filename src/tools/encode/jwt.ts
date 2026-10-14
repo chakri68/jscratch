@@ -1,4 +1,5 @@
 import type { Tool } from "../types";
+import { span } from "../util";
 
 function part(s: string, name: string): unknown {
   if (!/^[A-Za-z0-9\-_]+$/.test(s)) {
@@ -9,16 +10,6 @@ function part(s: string, name: string): unknown {
   } catch {
     throw new Error(`${name} is not valid JSON`);
   }
-}
-
-function span(secs: number): string {
-  const units: [string, number][] = [["d", 86400], ["h", 3600], ["m", 60], ["s", 1]];
-  for (const [u, n] of units) {
-    if (secs >= n) {
-      return `${Math.floor(secs / n)}${u}`;
-    }
-  }
-  return "0s";
 }
 
 function expiry(payload: unknown): string {

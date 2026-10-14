@@ -15,7 +15,11 @@ export const jsonTs: Tool = {
     const t = inferType(v);
     return {
       ok: true,
-      output: Array.isArray(v) ? `type Root = ${t};` : `interface Root ${t}`,
+      // Only a plain object can be an interface; everything else is an alias.
+      output:
+        typeof v === "object" && v !== null && !Array.isArray(v)
+          ? `interface Root ${t}`
+          : `type Root = ${t};`,
     };
   },
 };

@@ -107,3 +107,26 @@ test("tabulate handles 200k array rows", () => {
   const rows = Array.from({ length: 200000 }, (_, i) => [i, i]);
   assert.equal(tabulate(rows)?.rows.length, 200000);
 });
+
+test("serialize csv JSON-encodes nested cells, empties null/undefined", () => {
+  assert.equal(
+    serialize("csv", [{ a: { b: 1 }, c: [1, 2], d: null, e: undefined }]),
+    'a,c,d,e\r\n"{""b"":1}","[1,2]",,',
+  );
+  assert.equal(serialize("csv", [[{ x: 1 }, null]]), '"{""x"":1}",');
+});
+
+test("serialize csv rejects mixed rows, naming the row", () => {
+  assert.throws(
+    () => serialize("csv", [[1, 2], { a: 1 }]),
+    /^Error: CSV needs an array of objects or arrays \(row 2 is object\)$/,
+  );
+  assert.throws(
+    () => serialize("csv", [{ a: 1 }, 5]),
+    /CSV needs an array of objects or arrays \(row 2 is number\)/,
+  );
+});
+
+test("serialize csv keeps keys missing from row 1", () => {
+  assert.equal(serialize("csv", [{ a: 1 }, { b: 2 }]), "a,b\r\n1,\r\n,2");
+});

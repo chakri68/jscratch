@@ -95,3 +95,19 @@ test("meta names the direction", () => {
   assert.ok(r.ok);
   assert.equal(r.meta, "JSON → YAML");
 });
+
+test("json-csv JSON-encodes nested values", () => {
+  assert.equal(
+    out(run("json-csv", '[{"a":{"b":1},"c":[1,2]}]')),
+    'a,c\r\n"{""b"":1}","[1,2]"',
+  );
+});
+
+test("json-ts: primitive root is a type alias", () => {
+  assert.equal(out(run("json-ts", "42")), "type Root = number;");
+  assert.equal(out(run("json-ts", "null")), "type Root = any;");
+});
+
+test("json-ts: non-identifier keys are JSON-quoted", () => {
+  assert.match(out(run("json-ts", '{"a\\"b":1}')), /"a\\"b": number;/);
+});

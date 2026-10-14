@@ -54,6 +54,8 @@ export async function runTransform(req: RunRequest): Promise<RunResult> {
         platform: "node",
         format: "cjs",
         outfile: outFile,
+        // Inline map + --enable-source-maps: stacks name userTransform.ts lines, not out.js.
+        sourcemap: "inline",
         logLevel: "silent",
       });
     } catch (e: any) {
@@ -72,7 +74,12 @@ export async function runTransform(req: RunRequest): Promise<RunResult> {
     if (req.signal?.aborted) {
       return done({ ok: false, error: "Cancelled", parseWarning });
     }
-    const outcome = await spawnAndWait(req, dir, [outFile, inputPath, resultPath]);
+    const outcome = await spawnAndWait(req, dir, [
+      "--enable-source-maps",
+      outFile,
+      inputPath,
+      resultPath,
+    ]);
     if (outcome.kind === "timeout") {
       return done({
         ok: false,

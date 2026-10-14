@@ -30,6 +30,11 @@ export function nextTransformName(existing: string[]): string {
   return `transform-${max + 1}.ts`;
 }
 
+/** A transform's output format. Nodes from before 0.1 have none and stay json. */
+export function effectiveFormat(node: { outputFormat?: DataFormat }): DataFormat {
+  return node.outputFormat ?? "json";
+}
+
 export function outputFilenameFor(
   transformFilename: string,
   format: DataFormat,

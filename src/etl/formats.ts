@@ -86,18 +86,55 @@ export function parse(
   }
 }
 
+function shapeOf(v: unknown): string {
+  if (v === null) {
+    return "null";
+  }
+  return Array.isArray(v) ? "array" : typeof v;
+}
+
+/** Nested values become JSON (same as the preview's cells); null/undefined become empty. */
+function csvCell(v: unknown): unknown {
+  if (v === null || v === undefined) {
+    return "";
+  }
+  return typeof v === "object" ? JSON.stringify(v) : v;
+}
+
+function toCsv(value: unknown): string {
+  const shape = "CSV needs an array of objects or arrays";
+  if (!Array.isArray(value)) {
+    throw new Error(shape);
+  }
+  if (value.length === 0) {
+    return "";
+  }
+  const want = shapeOf(value[0]) === "array" ? "array" : "object";
+  value.forEach((row, i) => {
+    if (shapeOf(row) !== want) {
+      throw new Error(`${shape} (row ${i + 1} is ${shapeOf(row)})`);
+    }
+  });
+  if (want === "array") {
+    return Papa.unparse((value as unknown[][]).map((r) => r.map(csvCell)));
+  }
+  // Union of keys, so a field missing from row 1 isn't dropped.
+  const table = tabulate(value);
+  if (!table) {
+    throw new Error(shape);
+  }
+  return Papa.unparse({
+    fields: table.columns,
+    data: table.rows.map((r) => r.map(csvCell)),
+  });
+}
+
 export function serialize(format: DataFormat, value: unknown): string {
   switch (format) {
     case "json":
       return JSON.stringify(value ?? null, null, 2);
     case "csv":
-      if (
-        !Array.isArray(value) ||
-        !value.every((r) => typeof r === "object" && r !== null)
-      ) {
-        throw new Error("CSV needs an array of objects or arrays");
-      }
-      return Papa.unparse(value as object[] | unknown[][]);
+      return toCsv(value);
     case "ndjson":
       if (!Array.isArray(value)) {
         throw new Error("NDJSON needs an array");
