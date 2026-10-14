@@ -1,60 +1,147 @@
 name: Release
 
+# Ships when package.json's version changes on master and that version has no
+# tag yet. "Run workflow" (manual) republishes the current version even if the
+# tag exists — use it to retry a failed publish. Stores skip versions they
+# already have, so re-running is safe.
+
 on:
   push:
-    branches:
-      - master
-    paths:
-      - "package.json"
+    branches: [master]
+    paths: ["package.json"]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
-  release:
+  check:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tag_exists: ${{ steps.v.outputs.tag_exists }}
+      go: ${{ steps.v.outputs.go }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "npm"
-
-      - name: Get version from package.json
-        id: get_version
+      - id: v
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Check if tag exists
-        id: check_tag
-        run: |
-          TAG="v${{ steps.get_version.outputs.version }}"
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists. Skipping release."
-            echo "exists=true" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              echo "go=true" >> "$GITHUB_OUTPUT"
+              echo "v$VERSION exists — manual run, republishing."
+            else
+              echo "go=false" >> "$GITHUB_OUTPUT"
+              echo "v$VERSION exists — nothing to release."
+            fi
           else
-            echo "Tag $TAG does not exist. Creating release."
-            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "tag_exists=false" >> "$GITHUB_OUTPUT"
+            echo "go=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Install dependencies
-        if: steps.check_tag.outputs.exists == 'false'
-        run: npm ci
-
-      - name: Package Extension
-        if: steps.check_tag.outputs.exists == 'false'
-        run: npx vsce package
-
-      - name: Create Release
-        if: steps.check_tag.outputs.exists == 'false'
-        uses: softprops/action-gh-release@v1
+  # Transforms spawn the native esbuild binary, so prove it runs on each OS
+  # before shipping that OS a package.
+  test:
+    needs: check
+    if: needs.check.outputs.go == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          tag_name: v${{ steps.get_version.outputs.version }}
-          files: "*.vsix"
-          generate_release_notes: true
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:unit
+
+  package:
+    needs: [check, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # one vsix per platform, each with only that platform's esbuild binary
+      - run: node scripts/package-targets.mjs
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vsix
+          path: dist/*.vsix
+          if-no-files-found: error
+
+  publish:
+    needs: [check, package]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v8
+        with:
+          name: vsix
+          path: dist
+
+      - name: Publish to VS Code Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "::error::VSCE_PAT secret is not set — see README › Releasing"
+            exit 1
+          fi
+          npx vsce publish --skip-duplicate --packagePath dist/*.vsix
+
+      - name: Publish to Open VSX
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          if [ -z "$OVSX_PAT" ]; then
+            echo "OVSX_PAT not set — skipping Open VSX."
+            exit 0
+          fi
+          npx --yes ovsx@1.2.0 publish --skip-duplicate --packagePath dist/*.vsix
+
+      - name: Release notes from CHANGELOG
+        run: |
+          awk -v v="$VERSION" '
+            $0 ~ "^## " v "([^0-9.]|$)" { on = 1; next }
+            on && /^## / { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "See CHANGELOG.md." > notes.md
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v$VERSION"
+          if [ "${{ needs.check.outputs.tag_exists }}" = "true" ]; then
+            gh release edit "$TAG" --notes-file notes.md
+            gh release upload "$TAG" dist/*.vsix --clobber
+            # drop a pre-platform-split universal package, if one is attached
+            gh release delete-asset "$TAG" "jscratch-$VERSION.vsix" --yes 2>/dev/null || true
+          else
+            gh release create "$TAG" dist/*.vsix --target "$GITHUB_SHA" \
+              --title "$TAG" --notes-file notes.md
+          fi

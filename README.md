@@ -13,6 +13,18 @@ two things in one sidebar:
 
 the two talk to each other: any tool output can be sent into the active session as a new input.
 
+## install
+
+grab it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=chakri68.jscratch), or search "JScratch" in the Extensions view. Cursor / VSCodium / Windsurf folks: it's on [Open VSX](https://open-vsx.org/extension/chakri68/jscratch) too, when that's set up.
+
+supported: Linux (x64, arm64), macOS (Intel, Apple silicon), Windows (x64, arm64). each platform gets its own package with just its own esbuild binary, which is why it's ~4.5 MB instead of carrying all six.
+
+offline, or want a specific build: download the `.vsix` for your platform from [GitHub releases](https://github.com/chakri68/jscratch/releases) and run
+
+```
+code --install-extension jscratch-<version>-<platform>.vsix
+```
+
 ## the ETL walkthrough
 
 1. click the JScratch icon in the activity bar, then **New Session**.
@@ -135,7 +147,7 @@ every output has **Copy**, **Insert** (into the editor you were last in), **Open
 | --- | --- | --- |
 | `jscratch.pipeline.runOnSave` | `false` | run a transform when you save it |
 | `jscratch.pipeline.timeoutMs` | `60000` | kill a transform after this many milliseconds (min 1000) |
-| `jscratch.pipeline.defaultOutputFormat` | `"json"` | output format for transforms that don't set their own: `json`, `csv`, `ndjson`, `txt` |
+| `jscratch.pipeline.defaultOutputFormat` | `"json"` | output format given to newly created transforms: `json`, `csv`, `ndjson`, `txt`. existing transforms keep theirs (pre-0.1 ones stay `json`) |
 | `jscratch.preview.maxRows` | `1000` | max rows sent to the data preview |
 
 ## Commands
@@ -156,6 +168,28 @@ on tree nodes: **Add Transform**, **Run Branch**, **Reload Types**, **Set Output
 
 ## Requirements
 
-VS Code 1.85 or newer. that's it. esbuild ships inside the extension, and transforms run on the Node that VS Code already has.
+VS Code 1.85 or newer on one of the platforms above. that's it. esbuild ships inside the extension, and transforms run on the Node that VS Code already has.
 
 release notes live in [CHANGELOG.md](CHANGELOG.md).
+
+## releasing
+
+notes for future me.
+
+1. bump `version` in `package.json` and add a `## <version>` section to `CHANGELOG.md`.
+2. push to `master`. that's the release: `.github/workflows/release.yml` runs whenever `package.json` changes on master and that version has no tag yet.
+
+the workflow:
+
+- **test**: typecheck + unit tests on Linux, macOS and Windows. transforms spawn the native esbuild binary, so this is what proves each platform's package will actually run.
+- **package**: `scripts/package-targets.mjs` builds six `.vsix` files on one Ubuntu runner. for each target it swaps that platform's `@esbuild/<target>` into `node_modules` (pinned to the installed esbuild version) and runs `vsce package --target`. works locally too: `node scripts/package-targets.mjs [target ...]`, output in `dist/`, your own `node_modules` gets put back afterwards.
+- **publish**: Marketplace, then Open VSX, then a GitHub release with all six packages and the CHANGELOG section as notes. both stores use `--skip-duplicate`, so re-running is harmless.
+
+secrets (repo → Settings → Secrets and variables → Actions):
+
+| Secret | What | Required |
+| --- | --- | --- |
+| `VSCE_PAT` | Azure DevOps token, scope **Marketplace → Manage**, organization **All accessible organizations**, from the Microsoft account that owns the `chakri68` publisher | yes |
+| `OVSX_PAT` | token from [open-vsx.org](https://open-vsx.org) › Settings › Access Tokens. first time only: `npx ovsx create-namespace chakri68 -p <token>` | no, the step skips without it |
+
+if a publish fails (expired token, store hiccup), fix it and hit **Run workflow** on the Release action. a manual run republishes the current version even when its tag already exists.

@@ -46,6 +46,7 @@ hit **Reload Types** on old transforms so the `TYPE DEFS` block picks up the rea
 - the transform template notes that `console.log` is safe.
 - every command sits under the **JScratch** category, and context-only commands are hidden from the palette.
 - redrawn icon set: marketplace icon, activity bar icon, per-node tree icons.
+- platform-specific packages for Linux, macOS and Windows (x64 + arm64), each carrying only its own esbuild binary. transforms used to fail outside Linux because only the Linux binary shipped, and the package is half the size now.
 - the README's ETL example now matches the real template (`export function transform()`, no `export default`).
 
 ### Fixed

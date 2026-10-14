@@ -12,7 +12,8 @@ vsc-extension-quickstart.md
 **/*.map
 out/test/**
 node_modules/**
-!node_modules/esbuild/**
+!node_modules/esbuild/package.json
+!node_modules/esbuild/lib/**
 !node_modules/@esbuild/**
 docs/**
 scripts/**
@@ -24,3 +25,4 @@ media/*.svg
 out/src/**
 esbuild.js
 .github/**
+dist/**
