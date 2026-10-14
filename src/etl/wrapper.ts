@@ -3,7 +3,6 @@
 // console.log can't corrupt it.
 export const WRAPPER_SOURCE = `
 import * as fs from "fs";
-import { transform } from "./userTransform";
 
 const [inputPath, resultPath] = process.argv.slice(2);
 (globalThis as any).input = JSON.parse(fs.readFileSync(inputPath, "utf-8"));
@@ -14,10 +13,11 @@ function write(obj: unknown) {
 
 async function run() {
   try {
+    const { transform } = require("./userTransform");
     const value = await transform();
     if (value === undefined) {
       write({ ok: false, error: "transform() returned undefined \\u2014 did you forget to return?" });
-      return;
+      process.exit(1);
     }
     let json: string | undefined;
     try {
@@ -29,15 +29,17 @@ async function run() {
         : /BigInt/.test(msg)
           ? "Result contains a BigInt, which JSON can't represent: " + msg
           : "Result isn't JSON-serializable: " + msg });
-      return;
+      process.exit(1);
     }
     if (json === undefined) {
       write({ ok: false, error: "Result isn't JSON-serializable (got " + typeof value + ")" });
-      return;
+      process.exit(1);
     }
     fs.writeFileSync(resultPath, '{"ok":true,"value":' + json + "}");
+    process.exit(0);
   } catch (e: any) {
     write({ ok: false, error: String((e && e.stack) || e) });
+    process.exit(1);
   }
 }
 

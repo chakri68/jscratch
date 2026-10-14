@@ -82,12 +82,63 @@ test("csv is parsed host-side", async () => {
   assert.strictEqual(r.value, "Smith, J");
 });
 
-test("abort", async () => {
+test("abort while running", async () => {
+  const ac = new AbortController();
+  const r = await run(
+    `function transform() { console.log("go"); while(true){} }`,
+    { signal: ac.signal, onLog: () => ac.abort() },
+  );
+  assert.strictEqual(r.error, "Cancelled");
+});
+
+test("already-aborted signal", async () => {
+  const ac = new AbortController();
+  ac.abort();
+  const t = Date.now();
+  const r = await run(`function transform() { return 1; }`, { signal: ac.signal });
+  assert.strictEqual(r.error, "Cancelled");
+  assert.ok(Date.now() - t < 1000);
+});
+
+test("abort during build", async () => {
   const ac = new AbortController();
   const p = run(`function transform() { while(true){} }`, { signal: ac.signal });
-  setTimeout(() => ac.abort(), 300);
+  ac.abort();
+  const t = Date.now();
   const r = await p;
   assert.strictEqual(r.error, "Cancelled");
+  assert.ok(Date.now() - t < 2000);
+});
+
+test("open handle doesn't cause a timeout", async () => {
+  const r = await run(
+    `function transform() { setInterval(() => {}, 1000); return 1; }`,
+    { timeoutMs: 3000 },
+  );
+  assert.ok(r.ok, r.error);
+  assert.strictEqual(r.value, 1);
+});
+
+test("load-time throw lands in error", async () => {
+  const r = await runTransform({
+    scriptSource: `throw new Error("at load"); export function transform() { return 1; }`,
+    inputFilename: "in.json",
+    inputRaw: "[]",
+    timeoutMs: 10000,
+  });
+  assert.ok(!r.ok);
+  assert.match(r.error!, /at load/);
+});
+
+test("top-level input read works", async () => {
+  const r = await runTransform({
+    scriptSource: `const n = input.data.length; export function transform() { return n; }`,
+    inputFilename: "in.json",
+    inputRaw: "[1,2]",
+    timeoutMs: 10000,
+  });
+  assert.ok(r.ok, r.error);
+  assert.strictEqual(r.value, 2);
 });
 
 test("flushes partial last line", async () => {

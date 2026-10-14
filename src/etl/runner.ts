@@ -69,6 +69,9 @@ export async function runTransform(req: RunRequest): Promise<RunResult> {
       return done({ ok: false, error, parseWarning });
     }
 
+    if (req.signal?.aborted) {
+      return done({ ok: false, error: "Cancelled", parseWarning });
+    }
     const outcome = await spawnAndWait(req, dir, [outFile, inputPath, resultPath]);
     if (outcome.kind === "timeout") {
       return done({
@@ -124,6 +127,7 @@ function spawnAndWait(
   args: string[],
 ): Promise<Outcome> {
   return new Promise((resolve) => {
+    if (req.signal?.aborted) return resolve({ kind: "cancelled" });
     const child = cp.spawn(req.nodePath ?? process.execPath, args, {
       cwd,
       env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
