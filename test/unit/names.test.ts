@@ -3,6 +3,7 @@ import { strict as assert } from "node:assert";
 import {
   nextTransformName,
   outputFilenameFor,
+  sessionIdFromUri,
   validateFileName,
 } from "../../src/etl/names";
 
@@ -56,4 +57,12 @@ test("outputFilenameFor swaps .ts for .out.<format>", () => {
     outputFilenameFor("transform-2.ts", "csv"),
     "transform-2.out.csv",
   );
+});
+
+test("sessionIdFromUri extracts the first path segment", () => {
+  assert.equal(sessionIdFromUri({ path: "/s1/a.ts" }), "s1");
+  assert.equal(sessionIdFromUri({ path: "/s1" }), "s1");
+  assert.equal(sessionIdFromUri({ path: "/" }), undefined);
+  assert.equal(sessionIdFromUri({ path: "" }), undefined);
+  assert.equal(sessionIdFromUri({ path: "/s1/sub/a.ts" }), "s1");
 });
