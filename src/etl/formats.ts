@@ -22,6 +22,8 @@ function lines(raw: string): string[] {
   return raw.split("\n").map((l) => l.replace(/\r$/, ""));
 }
 
+class NdjsonError extends Error {}
+
 export function parse(
   filename: string,
   raw: string,
@@ -37,13 +39,36 @@ export function parse(
           dynamicTyping: true,
           skipEmptyLines: true,
         });
+        const fatal = result.errors.find((e) => e.type === "Quotes");
+        if (fatal) {
+          return {
+            data: raw,
+            warning: `Invalid CSV in ${filename}: ${fatal.message}`,
+          };
+        }
+        // UndetectableDelimiter is expected for single-column files; ignore it.
+        const soft = result.errors.find((e) => e.type === "FieldMismatch");
+        if (soft) {
+          return {
+            data: result.data,
+            warning: `CSV row ${(soft.row ?? 0) + 1}: ${soft.message}`,
+          };
+        }
         return { data: result.data };
       }
       case "ndjson":
         return {
-          data: lines(raw)
-            .filter((l) => l.trim() !== "")
-            .map((l) => JSON.parse(l)),
+          data: lines(raw).flatMap((l, i) => {
+            if (l.trim() === "") {
+              return [];
+            }
+            try {
+              return [JSON.parse(l)];
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e);
+              throw new NdjsonError(`Invalid NDJSON at line ${i + 1}: ${msg}`);
+            }
+          }),
         };
       case "txt":
         return { data: lines(raw) };
@@ -51,16 +76,18 @@ export function parse(
         return { data: raw };
     }
   } catch (e) {
-    const label = format === "ndjson" ? "NDJSON" : "JSON";
+    if (e instanceof NdjsonError) {
+      return { data: raw, warning: e.message };
+    }
     const msg = e instanceof Error ? e.message : String(e);
-    return { data: raw, warning: `Invalid ${label} in ${filename}: ${msg}` };
+    return { data: raw, warning: `Invalid JSON in ${filename}: ${msg}` };
   }
 }
 
 export function serialize(format: DataFormat, value: unknown): string {
   switch (format) {
     case "json":
-      return JSON.stringify(value, null, 2);
+      return JSON.stringify(value ?? null, null, 2);
     case "csv":
       if (
         !Array.isArray(value) ||
@@ -123,7 +150,7 @@ export function tabulate(
     };
   }
   if (data.every((r) => Array.isArray(r))) {
-    const width = Math.max(...(data as unknown[][]).map((r) => r.length));
+    const width = (data as unknown[][]).reduce((m, r) => Math.max(m, r.length), 0);
     return {
       columns: Array.from({ length: width }, (_, i) => String(i + 1)),
       rows: data as unknown[][],

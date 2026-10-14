@@ -80,3 +80,30 @@ test("guessFormat", () => {
   assert.equal(guessFormat("a,b\n1,2"), "csv");
   assert.equal(guessFormat("hello"), "txt");
 });
+
+test("parse csv with unclosed quote falls back to raw with warning", () => {
+  const raw = 'a,b\n1,"oops\n';
+  const r = parse("x.csv", raw);
+  assert.equal(r.data, raw);
+  assert.match(r.warning ?? "", /CSV/);
+});
+
+test("parse csv with short row keeps data and warns", () => {
+  const r = parse("x.csv", "a,b\n1,2\n3\n");
+  assert.deepEqual(r.data, [{ a: 1, b: 2 }, { a: 3 }]);
+  assert.match(r.warning ?? "", /CSV row 2/);
+});
+
+test("parse ndjson warning has line number", () => {
+  const r = parse("x.ndjson", '{"a":1}\n\n{bad');
+  assert.match(r.warning ?? "", /Invalid NDJSON at line 3/);
+});
+
+test("serialize json of undefined is null", () => {
+  assert.equal(serialize("json", undefined), "null");
+});
+
+test("tabulate handles 200k array rows", () => {
+  const rows = Array.from({ length: 200000 }, (_, i) => [i, i]);
+  assert.equal(tabulate(rows)?.rows.length, 200000);
+});
