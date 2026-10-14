@@ -1,20 +1,9 @@
 import * as vscode from "vscode";
-import * as path from "path";
+import type { PipelineNode, SessionMetadata } from "./model";
 
-export interface PipelineNode {
-  id: string;
-  type: "input" | "transform" | "output";
-  label: string;
-  filename: string;
-  parentId?: string;
-}
+export type { PipelineNode, SessionMetadata };
 
-export interface SessionMetadata {
-  id: string;
-  created: string;
-  name?: string;
-  nodes: PipelineNode[];
-}
+const ACTIVE_SESSION_KEY = "jscratch.activeSessionId";
 
 export class SessionManager {
   private currentSessionId: string | undefined;
@@ -22,11 +11,35 @@ export class SessionManager {
   readonly onDidSessionChange: vscode.Event<void> =
     this._onDidSessionChange.event;
 
-  constructor(private readonly storageUri: vscode.Uri) {}
+  constructor(
+    private readonly storageUri: vscode.Uri,
+    private readonly memento: vscode.Memento,
+  ) {}
+
+  /** Re-activate the remembered session, if its directory still exists. */
+  public async restore(): Promise<void> {
+    const id = this.memento.get<string>(ACTIVE_SESSION_KEY);
+    if (!id) {
+      return;
+    }
+    try {
+      await vscode.workspace.fs.stat(this.getSessionUri(id));
+      this.currentSessionId = id;
+    } catch {
+      this.currentSessionId = undefined;
+      await this.memento.update(ACTIVE_SESSION_KEY, undefined);
+    }
+    this._onDidSessionChange.fire();
+  }
+
+  private async persistActive(): Promise<void> {
+    await this.memento.update(ACTIVE_SESSION_KEY, this.currentSessionId);
+  }
 
   public async createSession(name?: string): Promise<string> {
     const sessionId = new Date().toISOString().replace(/[:.]/g, "-");
     this.currentSessionId = sessionId;
+    await this.persistActive();
 
     const sessionUri = this.getSessionUri(sessionId);
     await vscode.workspace.fs.createDirectory(sessionUri);
@@ -46,6 +59,7 @@ export class SessionManager {
 
   public setSession(sessionId: string) {
     this.currentSessionId = sessionId;
+    void this.persistActive();
     this._onDidSessionChange.fire();
   }
 
@@ -79,6 +93,7 @@ export class SessionManager {
 
     if (this.currentSessionId === sessionId) {
       this.currentSessionId = undefined;
+      await this.persistActive();
     }
     this._onDidSessionChange.fire();
   }
@@ -172,5 +187,27 @@ export class SessionManager {
     // Update metadata
     metadata.nodes = metadata.nodes.filter((n) => !nodesToDelete.has(n.id));
     await this.saveMetadata(sessionId, metadata);
+  }
+
+  public async updateNode(
+    sessionId: string,
+    id: string,
+    patch: Partial<PipelineNode>,
+  ): Promise<void> {
+    const metadata = await this.getMetadata(sessionId);
+    const node = metadata.nodes.find((n) => n.id === id);
+    if (!node) {
+      return;
+    }
+    Object.assign(node, patch);
+    await this.saveMetadata(sessionId, metadata);
+  }
+
+  public async children(
+    sessionId: string,
+    id: string,
+  ): Promise<PipelineNode[]> {
+    const metadata = await this.getMetadata(sessionId);
+    return metadata.nodes.filter((n) => n.parentId === id);
   }
 }

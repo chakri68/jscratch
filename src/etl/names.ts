@@ -1,0 +1,38 @@
+import type { DataFormat } from "./formats";
+
+export function validateFileName(
+  name: string,
+  existing: string[],
+): string | undefined {
+  if (!name.trim()) {
+    return "Name can't be empty";
+  }
+  if (/[/\\]/.test(name)) {
+    return "Name can't contain a slash";
+  }
+  if (name === "pipeline.json") {
+    return "pipeline.json is reserved";
+  }
+  if (existing.includes(name)) {
+    return `${name} already exists`;
+  }
+  return undefined;
+}
+
+export function nextTransformName(existing: string[]): string {
+  let max = 0;
+  for (const name of existing) {
+    const m = /^transform-(\d+)\.ts$/.exec(name);
+    if (m) {
+      max = Math.max(max, Number(m[1]));
+    }
+  }
+  return `transform-${max + 1}.ts`;
+}
+
+export function outputFilenameFor(
+  transformFilename: string,
+  format: DataFormat,
+): string {
+  return `${transformFilename.replace(/\.ts$/, "")}.out.${format}`;
+}

@@ -12,7 +12,7 @@ import { TransformCodeLensProvider } from "./etl/codeLens";
 import { typeDefForFile } from "./etl/typeInference";
 import { transformTemplate, replaceTypeDefs } from "./etl/templates";
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   console.log('Congratulations, your extension "jscratch" is now active!');
 
   const fileSystemProvider = new JScratchFileSystemProvider(
@@ -24,7 +24,11 @@ export function activate(context: vscode.ExtensionContext) {
     }),
   );
 
-  const sessionManager = new SessionManager(context.globalStorageUri);
+  const sessionManager = new SessionManager(
+    context.globalStorageUri,
+    context.globalState,
+  );
+  await sessionManager.restore();
 
   const treeDataProvider = new PipelineTreeDataProvider(sessionManager);
   const pipelineTreeView = vscode.window.createTreeView(
