@@ -68,6 +68,10 @@
           "name": "Active Session"
         },
         {
+          "id": "jscratch.toolboxView",
+          "name": "Toolbox"
+        },
+        {
           "id": "jscratch.historyView",
           "name": "History"
         }
@@ -157,6 +161,52 @@
         "title": "Add Input (alias)",
         "category": "JScratch",
         "icon": "$(add)"
+      },
+      {
+        "command": "jscratch.openTool",
+        "title": "Open Tool…",
+        "category": "JScratch",
+        "icon": "$(search)"
+      },
+      {
+        "command": "jscratch.quick.base64.0",
+        "title": "Base64 Encode",
+        "category": "JScratch"
+      },
+      {
+        "command": "jscratch.quick.base64.1",
+        "title": "Base64 Decode",
+        "category": "JScratch"
+      },
+      {
+        "command": "jscratch.quick.url.0",
+        "title": "URL Encode",
+        "category": "JScratch"
+      },
+      {
+        "command": "jscratch.quick.url.1",
+        "title": "URL Decode",
+        "category": "JScratch"
+      },
+      {
+        "command": "jscratch.quick.jwt.0",
+        "title": "Decode JWT",
+        "category": "JScratch"
+      },
+      {
+        "command": "jscratch.quick.json-format.0",
+        "title": "Format JSON",
+        "category": "JScratch"
+      },
+      {
+        "command": "jscratch.quick.json-format.1",
+        "title": "Minify JSON",
+        "category": "JScratch"
+      },
+      {
+        "command": "jscratch.quick.json-yaml.0",
+        "title": "JSON → YAML",
+        "category": "JScratch"
       }
     ],
     "menus": {
@@ -174,6 +224,11 @@
         {
           "command": "jscratch.clearHistory",
           "when": "view == jscratch.historyView",
+          "group": "navigation"
+        },
+        {
+          "command": "jscratch.openToolbox",
+          "when": "view == jscratch.toolboxView",
           "group": "navigation"
         }
       ],
@@ -260,6 +315,79 @@
         {
           "command": "jscratch.reloadTypes",
           "when": "false"
+        },
+        {
+          "command": "jscratch.quick.base64.0",
+          "when": "false"
+        },
+        {
+          "command": "jscratch.quick.base64.1",
+          "when": "false"
+        },
+        {
+          "command": "jscratch.quick.url.0",
+          "when": "false"
+        },
+        {
+          "command": "jscratch.quick.url.1",
+          "when": "false"
+        },
+        {
+          "command": "jscratch.quick.jwt.0",
+          "when": "false"
+        },
+        {
+          "command": "jscratch.quick.json-format.0",
+          "when": "false"
+        },
+        {
+          "command": "jscratch.quick.json-format.1",
+          "when": "false"
+        },
+        {
+          "command": "jscratch.quick.json-yaml.0",
+          "when": "false"
+        }
+      ],
+      "editor/context": [
+        {
+          "submenu": "jscratch.editorSubmenu",
+          "when": "editorHasSelection",
+          "group": "9_jscratch"
+        }
+      ],
+      "jscratch.editorSubmenu": [
+        {
+          "command": "jscratch.quick.base64.0",
+          "group": "quick"
+        },
+        {
+          "command": "jscratch.quick.base64.1",
+          "group": "quick"
+        },
+        {
+          "command": "jscratch.quick.url.0",
+          "group": "quick"
+        },
+        {
+          "command": "jscratch.quick.url.1",
+          "group": "quick"
+        },
+        {
+          "command": "jscratch.quick.jwt.0",
+          "group": "quick"
+        },
+        {
+          "command": "jscratch.quick.json-format.0",
+          "group": "quick"
+        },
+        {
+          "command": "jscratch.quick.json-format.1",
+          "group": "quick"
+        },
+        {
+          "command": "jscratch.quick.json-yaml.0",
+          "group": "quick"
         }
       ]
     },
@@ -273,6 +401,19 @@
         "view": "jscratch.pipelineView",
         "contents": "This session is empty.\n[Add Input](command:jscratch.addInput)",
         "when": "jscratch.hasSession && jscratch.sessionEmpty"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "jscratch.editorSubmenu",
+        "label": "JScratch"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "jscratch.openTool",
+        "key": "ctrl+alt+j",
+        "mac": "cmd+alt+j"
       }
     ]
   },

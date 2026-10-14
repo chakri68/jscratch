@@ -8,6 +8,9 @@ import { TransformCodeLensProvider } from "./etl/codeLens";
 import { registerPipelineCommands } from "./etl/commands";
 import { StatusDecorationProvider } from "./etl/statusDecorations";
 import { registerToolbox } from "./toolbox/toolboxPanel";
+import { ToolboxTreeDataProvider } from "./toolbox/toolboxTree";
+import { registerLauncher } from "./toolbox/launcher";
+import { registerEditorActions } from "./toolbox/editorActions";
 import { log } from "./log";
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -96,6 +99,13 @@ export async function activate(context: vscode.ExtensionContext) {
 
   registerPipelineCommands(context, { sessionManager, executor });
   registerToolbox(context, sessionManager);
+  registerLauncher(context);
+  registerEditorActions(context);
+  context.subscriptions.push(
+    vscode.window.createTreeView("jscratch.toolboxView", {
+      treeDataProvider: new ToolboxTreeDataProvider(),
+    }),
+  );
 
   // Commands are live before this runs, so a failed restore can't take them down.
   // Listeners are registered above; restore fires onDidSessionChange.
