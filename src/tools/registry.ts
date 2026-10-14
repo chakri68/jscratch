@@ -4,9 +4,25 @@ import { url } from "./encode/url";
 import { html } from "./encode/html";
 import { hex } from "./encode/hex";
 import { jwt } from "./encode/jwt";
+import { jsonFormat } from "./convert/json";
+import { jsonYaml } from "./convert/yaml";
+import { jsonCsv } from "./convert/csv";
+import { jsonToml } from "./convert/toml";
+import { jsonTs } from "./convert/tsTypes";
 
 // Order: encode -> convert -> generate -> inspect. Later tasks append here.
-const TOOLS: Tool[] = [base64, url, html, hex, jwt];
+const TOOLS: Tool[] = [
+  base64,
+  url,
+  html,
+  hex,
+  jwt,
+  jsonFormat,
+  jsonYaml,
+  jsonCsv,
+  jsonToml,
+  jsonTs,
+];
 
 const MAX_FIELD = 5 * 1024 * 1024;
 

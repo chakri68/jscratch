@@ -36,9 +36,9 @@ test("tools are ordered by category", () => {
   assert.deepEqual(idx, [...idx].sort((a, b) => a - b));
 });
 
-test("quickActions lists base64, url, jwt", () => {
+test("quickActions lists encode and convert actions", () => {
   const labels = quickActions().map((q) => q.action.label);
-  assert.deepEqual(labels, ["Base64 Encode", "Base64 Decode", "URL Encode", "URL Decode", "Decode JWT"]);
+  assert.deepEqual(labels, ["Base64 Encode", "Base64 Decode", "URL Encode", "URL Decode", "Decode JWT", "Format JSON", "Minify JSON", "JSON → YAML"]);
 });
 
 test("a throwing tool becomes ok:false", async () => {
