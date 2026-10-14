@@ -160,6 +160,7 @@
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.1",
     "@types/node": "20.x",
+    "@types/papaparse": "^5.5.2",
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^5.59.1",
     "@typescript-eslint/parser": "^5.59.1",
@@ -168,6 +169,7 @@
     "eslint": "^8.39.0",
     "glob": "^8.1.0",
     "mocha": "^10.2.0",
+    "papaparse": "^5.7.0",
     "tsx": "^4.23.15",
     "typescript": "^5.1.3"
   },

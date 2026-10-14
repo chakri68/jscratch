@@ -19,6 +19,6 @@ test("typeDefForFile falls back to any on invalid json", () => {
 
 test("typeDefForFile by extension", () => {
   assert.equal(typeDefForFile("x.txt", "a\nb"), "string[]");
-  assert.equal(typeDefForFile("x.csv", "a,b"), "string[][]");
+  assert.match(typeDefForFile("x.csv", "a\n1"), /a: number;/);
   assert.equal(typeDefForFile("x.bin", "zz"), "any");
 });

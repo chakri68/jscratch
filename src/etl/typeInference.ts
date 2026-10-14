@@ -1,3 +1,5 @@
+import { formatFromFilename, parse } from "./formats";
+
 export function inferType(value: unknown, indent = ""): string {
   if (value === null) {
     return "any";
@@ -32,20 +34,9 @@ export function inferType(value: unknown, indent = ""): string {
 
 /** Type definition string for an input file, by extension. Falls back to "any". */
 export function typeDefForFile(filename: string, raw: string): string {
-  const dot = filename.lastIndexOf(".");
-  const ext = dot === -1 ? "" : filename.slice(dot).toLowerCase();
-  if (ext === ".json") {
-    try {
-      return inferType(JSON.parse(raw), "    ");
-    } catch {
-      return "any";
-    }
+  if (!formatFromFilename(filename)) {
+    return "any";
   }
-  if (ext === ".csv") {
-    return "string[][]";
-  }
-  if (ext === ".txt") {
-    return "string[]";
-  }
-  return "any";
+  const { data, warning } = parse(filename, raw);
+  return warning ? "any" : inferType(data, "    ");
 }
