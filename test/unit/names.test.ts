@@ -6,6 +6,7 @@ import {
   sessionIdFromUri,
   uniqueName,
   safeInputName,
+  classifyDropUris,
   validateFileName,
 } from "../../src/etl/names";
 
@@ -83,4 +84,22 @@ test("safeInputName avoids the reserved name and collisions", () => {
     "pipeline-3.json",
   );
   assert.equal(safeInputName("data.json", ["data.json"]), "data-2.json");
+});
+
+test("classifyDropUris: file kept, datalab ignored, others skipped", () => {
+  assert.deepEqual(
+    classifyDropUris("file:///a/b.csv\r\ndatalab:/s1/x.json\n"),
+    {
+      files: ["file:///a/b.csv"],
+      skipped: 0,
+    },
+  );
+  assert.deepEqual(classifyDropUris("https://example.com/x"), {
+    files: [],
+    skipped: 1,
+  });
+  assert.deepEqual(classifyDropUris("# note\n\n   \n  file:///a.txt  \n"), {
+    files: ["file:///a.txt"],
+    skipped: 0,
+  });
 });

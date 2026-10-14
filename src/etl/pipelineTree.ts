@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { SessionManager, PipelineNode } from "./sessionManager";
 import { parse } from "./formats";
-import { safeInputName } from "./names";
+import { safeInputName, classifyDropUris } from "./names";
 import { addInputFile } from "./inputs";
 
 /** Skip row counting for files at or above this size. */
@@ -84,7 +84,7 @@ export class PipelineTreeDataProvider
       if (ms === undefined) {
         return undefined;
       }
-      return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`;
+      return ms < 999.5 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`;
     }
     if (node.type !== "output") {
       return undefined;
@@ -132,16 +132,8 @@ export class PipelineTreeDataProvider
       return;
     }
     const list = await item.asString();
-    const uris = list
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter((l) => l && !l.startsWith("#"))
-      .map((l) => vscode.Uri.parse(l))
-      .filter((u) => u.scheme === "file");
-    const all = list
-      .split(/\r?\n/)
-      .filter((l) => l.trim() && !l.startsWith("#"));
-    const skipped = all.length - uris.length;
+    const { files, skipped } = classifyDropUris(list);
+    const uris = files.map((l) => vscode.Uri.parse(l));
     if (skipped > 0) {
       vscode.window.showInformationMessage(
         `Skipped ${skipped} item(s) that aren't local files`,

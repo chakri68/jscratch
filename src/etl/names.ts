@@ -62,3 +62,28 @@ export function uniqueName(name: string, existing: string[]): string {
 export function safeInputName(base: string, existing: string[]): string {
   return uniqueName(base, [...existing, "pipeline.json"]);
 }
+
+/**
+ * Split a `text/uri-list` payload into `file:` URIs and a count of foreign ones.
+ * `datalab:` lines (a tree item dragged within the view) are ignored, not skipped.
+ */
+export function classifyDropUris(uriList: string): {
+  files: string[];
+  skipped: number;
+} {
+  const files: string[] = [];
+  let skipped = 0;
+  for (const raw of uriList.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+    const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(line)?.[1].toLowerCase();
+    if (scheme === "file") {
+      files.push(line);
+    } else if (scheme !== "datalab") {
+      skipped++;
+    }
+  }
+  return { files, skipped };
+}
