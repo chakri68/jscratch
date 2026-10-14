@@ -1,5 +1,6 @@
 import { randomInt } from "node:crypto";
 import type { Tool } from "../types";
+import { clampInt } from "../util";
 
 const WORDS = (
   "lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut " +
@@ -21,10 +22,13 @@ function words(n: number, first: boolean): string[] {
   return out;
 }
 
-function sentence(first: boolean): string {
-  const w = words(randomInt(8, 15), first);
+function capitalize(w: string[]): string[] {
   w[0] = w[0][0].toUpperCase() + w[0].slice(1);
-  return `${w.join(" ")}.`;
+  return w;
+}
+
+function sentence(first: boolean): string {
+  return `${capitalize(words(randomInt(8, 15), first)).join(" ")}.`;
 }
 
 function paragraph(first: boolean): string {
@@ -50,10 +54,10 @@ export const lorem: Tool = {
     { id: "count", label: "Count", kind: "number", default: 3 },
   ],
   run(_fields, { unit, count }) {
-    const n = Math.min(100, Math.max(1, Math.floor(Number(count)) || 1));
+    const n = clampInt(count, 1, 100, 3);
     const idx = Array.from({ length: n }, (_, i) => i === 0);
     if (unit === "words") {
-      return { ok: true, output: words(n, true).join(" ") };
+      return { ok: true, output: capitalize(words(n, true)).join(" ") };
     }
     if (unit === "sentences") {
       return { ok: true, output: idx.map(sentence).join(" ") };

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runTool } from "../../../src/tools/registry";
+import { clampInt } from "../../../src/tools/util";
 import { uuidV7 } from "../../../src/tools/generate/uuid";
 
 const gen = (id: string, options: Record<string, unknown> = {}, fields: Record<string, string> = {}) =>
@@ -23,12 +24,36 @@ test("uuid v7 matches regex", () => {
 });
 
 test("uuid v7 sorts by time, including within the same ms", () => {
-  const t = 1700000000000;
+  // far in the future so the module's lastMs (real clock) can't clamp it
+  const t = Date.now() + 1e9;
   const a = uuidV7(t);
   const b = uuidV7(t + 2);
-  assert.ok(a < b);
-  const same = Array.from({ length: 50 }, () => uuidV7(t + 10));
+  const c = uuidV7(t + 10);
+  assert.ok(a < b && b < c);
+  const ts = (id: string) => parseInt(id.slice(0, 8) + id.slice(9, 13), 16);
+  assert.equal(ts(a), t);
+  assert.equal(ts(b), t + 2);
+  assert.equal(ts(c), t + 10);
+  const same = Array.from({ length: 50 }, () => uuidV7(t + 20));
   assert.deepEqual([...same].sort(), same);
+});
+
+test("uuid v7 counter overflow borrows the next ms and stays ordered", () => {
+  const t2 = Date.now() + 1e9 + 1e6;
+  const ids = Array.from({ length: 4200 }, () => uuidV7(t2));
+  for (let i = 1; i < ids.length; i++) {
+    assert.ok(ids[i - 1] < ids[i], `out of order at ${i}`);
+  }
+  const last = ids[ids.length - 1];
+  assert.ok(parseInt(last.slice(0, 8) + last.slice(9, 13), 16) > t2);
+});
+
+test("clampInt", () => {
+  assert.equal(clampInt(5.9, 1, 10, 3), 5);
+  assert.equal(clampInt(-4, 1, 10, 3), 1);
+  assert.equal(clampInt(99, 1, 10, 3), 10);
+  assert.equal(clampInt("abc", 1, 10, 3), 3);
+  assert.equal(clampInt(undefined, 1, 10, 3), 3);
 });
 
 test("uuid count and clamping", () => {
@@ -88,7 +113,9 @@ test("random respects charsets and length", () => {
 });
 
 test("lorem units", () => {
-  assert.equal(out(gen("lorem", { unit: "words", count: 5 })).split(" ").length, 5);
+  const w = out(gen("lorem", { unit: "words", count: 5 }));
+  assert.equal(w.split(" ").length, 5);
+  assert.equal(w, "Lorem ipsum dolor sit amet");
   const s = out(gen("lorem", { unit: "sentences", count: 3 }));
   assert.ok(s.startsWith("Lorem ipsum dolor sit amet"));
   assert.equal(s.split(". ").length, 3);

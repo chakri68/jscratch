@@ -1,5 +1,6 @@
 import { randomBytes, randomInt, randomUUID } from "node:crypto";
 import type { Tool } from "../types";
+import { clampInt } from "../util";
 
 let lastMs = -1;
 let counter = 0;
@@ -39,7 +40,7 @@ export const uuid: Tool = {
     { id: "count", label: "Count", kind: "number", default: 1 },
   ],
   run(_fields, { version, count }) {
-    const n = Math.min(1000, Math.max(1, Math.floor(Number(count)) || 1));
+    const n = clampInt(count, 1, 1000, 1);
     const gen = version === "v7" ? uuidV7 : randomUUID;
     return { ok: true, output: Array.from({ length: n }, () => gen()).join("\n") };
   },

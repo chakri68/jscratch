@@ -1,5 +1,6 @@
 import { randomInt } from "node:crypto";
 import type { Tool } from "../types";
+import { clampInt } from "../util";
 
 const SETS: [string, string][] = [
   ["upper", "ABCDEFGHIJKLMNOPQRSTUVWXYZ"],
@@ -27,7 +28,7 @@ export const random: Tool = {
     if (!pool) {
       return { ok: false, error: "Pick at least one character set" };
     }
-    const n = Math.min(1024, Math.max(1, Math.floor(Number(options.length)) || 1));
+    const n = clampInt(options.length, 1, 1024, 24);
     let out = "";
     for (let i = 0; i < n; i++) {
       out += pool[randomInt(pool.length)];
