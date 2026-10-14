@@ -37,7 +37,10 @@ export function valuesFor(tool: ToolMeta, saved: ToolValues | undefined): ToolVa
   }
   const options: OptionValues = {};
   for (const o of tool.options ?? []) {
-    options[o.id] = saved?.options?.[o.id] ?? o.default;
+    const v = saved?.options?.[o.id] ?? o.default;
+    if (v !== undefined) {
+      options[o.id] = v; // never store undefined: it would override the default host-side
+    }
   }
   return { fields, options };
 }

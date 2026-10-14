@@ -3,6 +3,7 @@ import type { ToolboxFromWebview, ToolboxToWebview, ToolMeta } from "./protocol"
 import { h, isTyping } from "./toolbox/dom";
 import { Rail } from "./toolbox/rail";
 import { renderPane, valuesFor, type Pane, type ToolValues } from "./toolbox/pane";
+import { planSelect, shouldRender } from "./toolbox/selectPlan";
 
 declare function acquireVsCodeApi(): {
   postMessage(msg: ToolboxFromWebview): void;
@@ -82,10 +83,12 @@ function select(id: string, opts: { prefill?: string; focus?: boolean } = {}): v
   if (!next || !rail) {
     return;
   }
-  const changed = next.id !== tool?.id;
+  const changed = next.id !== tool?.id || !pane;
   tool = next;
   state.selected = next.id;
-  if (changed || !pane) {
+  if (changed) {
+    requestId++; // whatever was in flight belongs to the old pane
+    clearTimeout(timer);
     state.values[next.id] = valuesFor(next, state.values[next.id]);
     pane = renderPane(next, state.values[next.id], {
       field: guard(onField),
@@ -104,9 +107,11 @@ function select(id: string, opts: { prefill?: string; focus?: boolean } = {}): v
     rail.setActive(next.id);
     post({ type: "selected", toolId: next.id });
   }
-  if (opts.prefill !== undefined) {
-    fillFirst(opts.prefill);
-  } else if (changed) {
+  const plan = planSelect(next, opts.prefill, changed);
+  if (plan.fill !== undefined) {
+    setFirst(plan.fill);
+  }
+  if (plan.run) {
     run();
   }
   save();
@@ -134,7 +139,7 @@ function run(): void {
 }
 
 function onResult(id: number, result: ToolResult): void {
-  if (id !== requestId || !pane || !tool) {
+  if (!shouldRender(id, requestId) || !pane || !tool) {
     return; // superseded by a newer run, or the tool changed
   }
   const blank = tool.fields.length > 0 && Object.values(sentFields).every((v) => v === "");
@@ -178,15 +183,22 @@ function onHelper(kind: "selection" | "paste"): void {
   navigator.clipboard.readText().then(guard(fillFirst), fallback);
 }
 
-function fillFirst(text: string): void {
+/** Puts `text` in the first field (no-op for generators). Returns whether it did. */
+function setFirst(text: string): boolean {
   const first = tool?.fields[0];
   if (!first || !pane) {
-    return;
+    return false;
   }
   pane.setField(first.id, text);
   current().fields[first.id] = text;
-  save();
-  run();
+  return true;
+}
+
+function fillFirst(text: string): void {
+  if (setFirst(text)) {
+    save();
+    run();
+  }
 }
 
 // --- keyboard -------------------------------------------------------------

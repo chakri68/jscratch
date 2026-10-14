@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { allTools, resolveTool, runTool } from "../tools/registry";
-import type { Tool } from "../tools/types";
+import type { Tool, ToolResult } from "../tools/types";
 import type { ToolMeta, ToolboxFromWebview, ToolboxToWebview } from "../webview/protocol";
 import { renderHtml, webviewOptions } from "../webview/html";
 import type { SessionManager } from "../etl/sessionManager";
@@ -59,7 +59,10 @@ class DiffDocs implements vscode.TextDocumentContentProvider {
   }
 
   provideTextDocumentContent(uri: vscode.Uri): string {
-    return this.docs.get(uri.toString()) ?? "";
+    return (
+      this.docs.get(uri.toString()) ??
+      "(diff content no longer available — run Open Diff again)"
+    );
   }
 }
 
@@ -132,15 +135,22 @@ export class ToolboxPanel {
       switch (m.type) {
         case "ready":
           return await this.onReady();
-        case "run":
-          await this.post({
-            type: "result",
-            requestId: m.requestId,
-            result: runTool(m.toolId, m.fields, m.options),
-          });
+        case "run": {
+          // Always answer, so the webview never waits on a request that blew up here.
+          let result: ToolResult;
+          try {
+            result = runTool(m.toolId, m.fields, m.options ?? {});
+          } catch (e) {
+            log.appendLine(`Toolbox: bad run request: ${e}`);
+            result = { ok: false, error: "Bad request" };
+          }
+          await this.post({ type: "result", requestId: m.requestId, result });
           return;
+        }
         case "selected":
-          await this.ctx.globalState.update(LAST_TOOL_KEY, m.toolId);
+          if (knownTool(m.toolId)) {
+            await this.ctx.globalState.update(LAST_TOOL_KEY, m.toolId);
+          }
           return;
         case "copy":
           await vscode.env.clipboard.writeText(m.text);
@@ -148,9 +158,15 @@ export class ToolboxPanel {
         case "insert":
           return await insertIntoEditor(m.text);
         case "openEditor":
-          return await openInEditor(m.text, m.toolId, m.options);
-        case "sendToPipeline":
-          return await sendToPipeline(m.text, m.toolId);
+        case "sendToPipeline": {
+          const tool = knownTool(m.toolId);
+          if (tool) {
+            return await (m.type === "openEditor"
+              ? openInEditor(m.text, tool, m.options)
+              : sendToPipeline(m.text, tool.id));
+          }
+          return;
+        }
         case "openDiff":
           await vscode.commands.executeCommand(
             "vscode.diff",
@@ -169,6 +185,8 @@ export class ToolboxPanel {
         case "requestClipboard":
           await this.post({ type: "selection", text: await vscode.env.clipboard.readText() });
           return;
+        default:
+          log.appendLine(`Toolbox: ignoring message ${JSON.stringify(m).slice(0, 200)}`);
       }
     } catch (e) {
       log.appendLine(`Toolbox: ${m.type} failed: ${e}`);
@@ -187,6 +205,15 @@ export class ToolboxPanel {
       await this.post({ type: "focusTool", ...pending });
     }
   }
+}
+
+/** The tool with this id, or undefined (logged): the webview's ids aren't trusted blindly. */
+function knownTool(id: unknown): Tool | undefined {
+  const tool = allTools().find((t) => t.id === id);
+  if (!tool) {
+    log.appendLine(`Toolbox: ignoring unknown tool id ${JSON.stringify(id)}`);
+  }
+  return tool;
 }
 
 /** Everything but `run`: functions don't survive postMessage, and tools run here anyway. */
@@ -210,7 +237,14 @@ function selectionText(): string | undefined {
 
 async function insertIntoEditor(text: string): Promise<void> {
   const editor = lastEditor;
-  if (!editor || editor.document.isClosed) {
+  // A closed-then-reopened file is a new TextDocument; find it again by uri.
+  const doc =
+    editor && !editor.document.isClosed
+      ? editor.document
+      : vscode.workspace.textDocuments.find(
+          (d) => !d.isClosed && d.uri.toString() === editor?.document.uri.toString(),
+        );
+  if (!editor || !doc) {
     vscode.window.showInformationMessage("No editor to insert into. Click into one first.");
     return;
   }
@@ -218,11 +252,11 @@ async function insertIntoEditor(text: string): Promise<void> {
   // toolbox keeps its tab even when it sits in the same column as the editor.
   const edit = new vscode.WorkspaceEdit();
   for (const s of editor.selections) {
-    edit.replace(editor.document.uri, s, text);
+    edit.replace(doc.uri, s, text);
   }
   if (await vscode.workspace.applyEdit(edit)) {
     vscode.window.setStatusBarMessage(
-      `$(check) Inserted into ${editor.document.fileName.split(/[\\/]/).pop()}`,
+      `$(check) Inserted into ${doc.fileName.split(/[\\/]/).pop()}`,
       2500,
     );
   } else {
@@ -232,11 +266,11 @@ async function insertIntoEditor(text: string): Promise<void> {
 
 async function openInEditor(
   text: string,
-  toolId: string,
+  tool: Tool,
   options: Record<string, unknown> | undefined,
 ): Promise<void> {
   // ⇄ tools emit JSON when converting back; outputLanguage only describes "to".
-  const wanted = options?.direction === "from" ? "json" : resolveTool(toolId).outputLanguage;
+  const wanted = options?.direction === "from" ? "json" : tool.outputLanguage;
   // An unregistered id (toml, csv without an extension) would fail the open.
   const language =
     wanted && (await vscode.languages.getLanguages()).includes(wanted) ? wanted : undefined;
