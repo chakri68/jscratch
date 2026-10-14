@@ -21,6 +21,7 @@ declare const input: InputData;
 
 /**
  * Transformation Script
+ * console.log is fine here: it goes to the JScratch output channel, not the result.
  */
 export function transform(): any {
     // TODO: Implement your transformation logic

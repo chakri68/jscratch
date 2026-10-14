@@ -21,7 +21,36 @@
   "contributes": {
     "configuration": {
       "title": "JScratch Settings",
-      "properties": {}
+      "properties": {
+        "jscratch.pipeline.runOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run a transform when you save it."
+        },
+        "jscratch.pipeline.timeoutMs": {
+          "type": "number",
+          "default": 60000,
+          "minimum": 1000,
+          "description": "Kill a transform after this many milliseconds."
+        },
+        "jscratch.pipeline.defaultOutputFormat": {
+          "type": "string",
+          "enum": [
+            "json",
+            "csv",
+            "ndjson",
+            "txt"
+          ],
+          "default": "json",
+          "description": "Output format for transforms that don't set their own."
+        },
+        "jscratch.preview.maxRows": {
+          "type": "number",
+          "default": 1000,
+          "minimum": 1,
+          "description": "Maximum rows sent to the data preview."
+        }
+      }
     },
     "viewsContainers": {
       "activitybar": [
@@ -72,7 +101,20 @@
       {
         "command": "jscratch.runTransform",
         "title": "Run Transformation",
-        "icon": "$(play)"
+        "icon": "$(play)",
+        "category": "JScratch"
+      },
+      {
+        "command": "jscratch.runBranch",
+        "title": "Run Branch",
+        "category": "JScratch",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "jscratch.setOutputFormat",
+        "title": "Set Output Format",
+        "category": "JScratch",
+        "icon": "$(symbol-enum)"
       },
       {
         "command": "jscratch.exportFile",
@@ -141,6 +183,21 @@
         },
         {
           "command": "jscratch.reloadTypes",
+          "when": "view == jscratch.pipelineView && viewItem == transform",
+          "group": "inline"
+        },
+        {
+          "command": "jscratch.runTransform",
+          "when": "view == jscratch.pipelineView && viewItem == transform",
+          "group": "inline"
+        },
+        {
+          "command": "jscratch.runBranch",
+          "when": "view == jscratch.pipelineView && viewItem == transform",
+          "group": "inline"
+        },
+        {
+          "command": "jscratch.setOutputFormat",
           "when": "view == jscratch.pipelineView && viewItem == transform",
           "group": "inline"
         }

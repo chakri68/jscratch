@@ -1,217 +1,237 @@
 import * as vscode from "vscode";
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
-import * as cp from "child_process";
-import * as esbuild from "esbuild";
 import { SessionManager, PipelineNode } from "./sessionManager";
+import { runTransform } from "./runner";
+import { serialize, DataFormat } from "./formats";
+import { outputFilenameFor } from "./names";
+import { log } from "../log";
+
+function firstLine(text: string | undefined): string {
+  return (text ?? "").split(/\r?\n/).find((l) => l.trim()) ?? "Unknown error";
+}
 
 export class Executor {
+  private running = new Set<string>();
+
   constructor(
     private sessionManager: SessionManager,
     private extensionUri: vscode.Uri,
   ) {}
 
-  async runTransform(nodeOrUri: PipelineNode | vscode.Uri) {
-    let node: PipelineNode | undefined;
+  /** Run one transform. Resolves true on success, false on any failure. */
+  async run(node: PipelineNode): Promise<boolean> {
     const sessionId = this.sessionManager.activeSessionId;
+    if (!sessionId) {
+      vscode.window.showErrorMessage("No active session");
+      return false;
+    }
+    // Re-read so format/filename changes made since the tree was rendered apply.
+    const current =
+      (await this.sessionManager.getNode(sessionId, node.id)) ?? node;
+    if (current.type !== "transform" || !current.parentId) {
+      vscode.window.showErrorMessage("Invalid transformation node");
+      return false;
+    }
+    if (this.running.has(current.id)) {
+      vscode.window.showInformationMessage(
+        `${current.filename} is already running`,
+      );
+      return false;
+    }
+    this.running.add(current.id);
+    try {
+      return await this.runInner(sessionId, current);
+    } finally {
+      this.running.delete(current.id);
+    }
+  }
 
+  private async runInner(
+    sessionId: string,
+    node: PipelineNode,
+  ): Promise<boolean> {
+    const tag = `[${node.filename}]`;
+    const sessionUri = this.sessionManager.getSessionUri(sessionId);
+    const parentNode = await this.sessionManager.getNode(
+      sessionId,
+      node.parentId!,
+    );
+    if (!parentNode) {
+      vscode.window.showErrorMessage("Parent node not found");
+      return false;
+    }
+
+    const fail = async (error: string, durationMs: number): Promise<false> => {
+      const line = firstLine(error);
+      for (const l of error.split(/\r?\n/)) {
+        log.appendLine(`${tag} ${l}`);
+      }
+      await this.sessionManager.updateNode(sessionId, node.id, {
+        lastRun: { at: Date.now(), ok: false, durationMs, error: line },
+      });
+      void vscode.window
+        .showErrorMessage(
+          `Transform failed: ${line}`,
+          "Show Log",
+          "Open Script",
+        )
+        .then(async (choice) => {
+          if (choice === "Show Log") {
+            log.show(true);
+          } else if (choice === "Open Script") {
+            const doc = await vscode.workspace.openTextDocument(
+              vscode.Uri.joinPath(sessionUri, node.filename),
+            );
+            await vscode.window.showTextDocument(doc);
+          }
+        });
+      return false;
+    };
+
+    const started = Date.now();
+    let inputRaw: string;
+    let scriptSource: string;
+    try {
+      const dec = new TextDecoder();
+      inputRaw = dec.decode(
+        await vscode.workspace.fs.readFile(
+          vscode.Uri.joinPath(sessionUri, parentNode.filename),
+        ),
+      );
+      scriptSource = dec.decode(
+        await vscode.workspace.fs.readFile(
+          vscode.Uri.joinPath(sessionUri, node.filename),
+        ),
+      );
+    } catch (e: any) {
+      return fail(
+        `Could not read files: ${e?.message ?? e}`,
+        Date.now() - started,
+      );
+    }
+
+    const cfg = vscode.workspace.getConfiguration("jscratch.pipeline");
+    const timeoutMs = cfg.get<number>("timeoutMs", 60000);
+    const format: DataFormat =
+      node.outputFormat ?? cfg.get<DataFormat>("defaultOutputFormat", "json");
+
+    const result = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Running ${node.filename}...`,
+        cancellable: true,
+      },
+      (_progress, token) => {
+        const ac = new AbortController();
+        token.onCancellationRequested(() => ac.abort());
+        return runTransform({
+          scriptSource,
+          inputFilename: parentNode.filename,
+          inputRaw,
+          timeoutMs,
+          signal: ac.signal,
+          onLog: (line) => log.appendLine(`${tag} ${line}`),
+        });
+      },
+    );
+
+    if (result.parseWarning) {
+      log.appendLine(`${tag} warning: ${result.parseWarning}`);
+    }
+    if (!result.ok) {
+      return fail(result.error ?? "Unknown error", result.durationMs);
+    }
+
+    let text: string;
+    try {
+      text = serialize(format, result.value);
+    } catch (e: any) {
+      return fail(e?.message ?? String(e), result.durationMs);
+    }
+
+    let outputUri: vscode.Uri;
+    try {
+      const wantedName = outputFilenameFor(node.filename, format);
+      const existing = (
+        await this.sessionManager.children(sessionId, node.id)
+      ).find((n) => n.type === "output");
+
+      if (existing) {
+        let outName = existing.filename;
+        if (extOf(existing.filename) !== format) {
+          await vscode.workspace.fs.rename(
+            vscode.Uri.joinPath(sessionUri, existing.filename),
+            vscode.Uri.joinPath(sessionUri, wantedName),
+            { overwrite: false },
+          );
+          await this.sessionManager.updateNode(sessionId, existing.id, {
+            filename: wantedName,
+            label: wantedName,
+          });
+          outName = wantedName;
+        }
+        outputUri = vscode.Uri.joinPath(sessionUri, outName);
+        await vscode.workspace.fs.writeFile(
+          outputUri,
+          new TextEncoder().encode(text),
+        );
+      } else {
+        outputUri = vscode.Uri.joinPath(sessionUri, wantedName);
+        await vscode.workspace.fs.writeFile(
+          outputUri,
+          new TextEncoder().encode(text),
+        );
+        await this.sessionManager.addNode(sessionId, {
+          id: Date.now().toString(),
+          type: "output",
+          label: wantedName,
+          filename: wantedName,
+          parentId: node.id,
+        });
+      }
+    } catch (e: any) {
+      return fail(
+        `Could not write output: ${e?.message ?? e}`,
+        result.durationMs,
+      );
+    }
+
+    await this.sessionManager.updateNode(sessionId, node.id, {
+      lastRun: { at: Date.now(), ok: true, durationMs: result.durationMs },
+    });
+
+    try {
+      const doc = await vscode.workspace.openTextDocument(outputUri);
+      await vscode.window.showTextDocument(doc, {
+        viewColumn: vscode.ViewColumn.Beside,
+        preserveFocus: true,
+      });
+    } catch (e: any) {
+      log.appendLine(`${tag} could not open output: ${e?.message ?? e}`);
+    }
+    return true;
+  }
+
+  /** Run `node`, then every descendant transform breadth-first. Stops at the first failure. */
+  async runBranch(node: PipelineNode): Promise<void> {
+    const sessionId = this.sessionManager.activeSessionId;
     if (!sessionId) {
       vscode.window.showErrorMessage("No active session");
       return;
     }
-
-    if (nodeOrUri instanceof vscode.Uri) {
-      // Find node by filename
-      const filename = path.basename(nodeOrUri.path);
-      const metadata = await this.sessionManager.getMetadata(sessionId);
-      node = metadata.nodes.find((n) => n.filename === filename);
-    } else {
-      node = nodeOrUri;
-    }
-
-    if (!node || !node.parentId) {
-      vscode.window.showErrorMessage("Invalid transformation node");
-      return;
-    }
-
-    const sessionUri = this.sessionManager.getSessionUri(sessionId);
-
-    // Get parent node (input)
-    const parentNode = await this.sessionManager.getNode(
-      sessionId,
-      node.parentId,
-    );
-    if (!parentNode) {
-      vscode.window.showErrorMessage("Parent node not found");
-      return;
-    }
-
-    // Create temp dir
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "jscratch-"));
-
-    try {
-      // 1. Materialize Input File
-      const inputUri = vscode.Uri.joinPath(sessionUri, parentNode.filename);
-      const inputContent = await vscode.workspace.fs.readFile(inputUri);
-      const tempInputPath = path.join(tempDir, parentNode.filename);
-      fs.writeFileSync(tempInputPath, inputContent);
-
-      // 2. Materialize Transform Script
-      const transformUri = vscode.Uri.joinPath(sessionUri, node.filename);
-      const transformContent = await vscode.workspace.fs.readFile(transformUri);
-      const tempTransformPath = path.join(tempDir, "userTransform.ts");
-      fs.writeFileSync(tempTransformPath, transformContent);
-
-      // 3. Create Wrapper Script
-      const wrapperPath = path.join(tempDir, "wrapper.ts");
-      const wrapperScript = `
-import * as fs from 'fs';
-import * as path from 'path';
-import { transform } from './userTransform';
-
-const inputPath = process.argv[2];
-const inputRaw = fs.readFileSync(inputPath, 'utf-8');
-const ext = path.extname(inputPath).toLowerCase();
-
-let data: any = inputRaw;
-try {
-    if (ext === '.json') {
-        data = JSON.parse(inputRaw);
-    } else if (ext === '.csv') {
-        data = inputRaw.split('\\n').map(line => line.split(','));
-    } else if (ext === '.txt') {
-        data = inputRaw.split('\\n');
-    }
-} catch (e) {
-    // Keep raw if parse fails
-}
-
-// Global injection
-(global as any).input = {
-    raw: inputRaw,
-    data: data
-};
-
-async function run() {
-    try {
-        const result = await transform();
-        console.log(JSON.stringify(result, null, 2));
-    } catch (e) {
-        console.error(e);
-        process.exit(1);
-    }
-}
-
-run();
-`;
-      fs.writeFileSync(wrapperPath, wrapperScript);
-
-      // 4. Compile with esbuild
-      const outFile = path.join(tempDir, "out.js");
-      try {
-        await esbuild.build({
-          entryPoints: [wrapperPath],
-          bundle: true,
-          platform: "node",
-          outfile: outFile,
-        });
-      } catch (e) {
-        vscode.window.showErrorMessage(`Compilation failed: ${e}`);
-        return;
+    const queue: PipelineNode[] = [node];
+    while (queue.length) {
+      const next = queue.shift()!;
+      if (next.type === "transform") {
+        if (!(await this.run(next))) {
+          return;
+        }
       }
-
-      // 5. Execute with node
-      const args = [outFile, tempInputPath];
-
-      await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: "Running transformation...",
-          cancellable: true,
-        },
-        async (progress, token) => {
-          return new Promise<void>((resolve, reject) => {
-            const child = cp.spawn(process.execPath, args, {
-              cwd: tempDir,
-              env: { ...process.env },
-            });
-
-            let stdout = "";
-            let stderr = "";
-
-            child.stdout.on("data", (data) => (stdout += data.toString()));
-            child.stderr.on("data", (data) => (stderr += data.toString()));
-
-            token.onCancellationRequested(() => {
-              child.kill();
-              reject(new Error("Cancelled by user"));
-            });
-
-            child.on("close", async (code) => {
-              if (code === 0) {
-                try {
-                  // Check for existing output node
-                  const metadata =
-                    await this.sessionManager.getMetadata(sessionId);
-                  const existingOutputNode = metadata.nodes.find(
-                    (n) => n.parentId === node!.id && n.type === "output",
-                  );
-
-                  let outputFilename: string;
-                  let outputUri: vscode.Uri;
-
-                  if (existingOutputNode) {
-                    outputFilename = existingOutputNode.filename;
-                    outputUri = vscode.Uri.joinPath(sessionUri, outputFilename);
-                  } else {
-                    outputFilename = `output-${Date.now()}.json`;
-                    outputUri = vscode.Uri.joinPath(sessionUri, outputFilename);
-                  }
-
-                  // 5. Save Output
-                  await vscode.workspace.fs.writeFile(
-                    outputUri,
-                    new TextEncoder().encode(stdout),
-                  );
-
-                  // 6. Add Output Node if it didn't exist
-                  if (!existingOutputNode) {
-                    await this.sessionManager.addNode(sessionId, {
-                      id: Date.now().toString(),
-                      type: "output",
-                      label: outputFilename,
-                      filename: outputFilename,
-                      parentId: node!.id,
-                    });
-                  }
-
-                  // Open Output
-                  const doc =
-                    await vscode.workspace.openTextDocument(outputUri);
-                  await vscode.window.showTextDocument(doc, {
-                    viewColumn: vscode.ViewColumn.Beside,
-                  });
-                  resolve();
-                } catch (e) {
-                  reject(e);
-                }
-              } else {
-                reject(new Error(stderr || "Unknown error"));
-              }
-            });
-          });
-        },
-      );
-    } catch (error: any) {
-      vscode.window.showErrorMessage(
-        `Execution failed: ${error.message || error}`,
-      );
-    } finally {
-      // Cleanup
-      try {
-        fs.rmSync(tempDir, { recursive: true, force: true });
-      } catch {}
+      queue.push(...(await this.sessionManager.children(sessionId, next.id)));
     }
   }
+}
+
+function extOf(filename: string): string {
+  const i = filename.lastIndexOf(".");
+  return i < 0 ? "" : filename.slice(i + 1).toLowerCase();
 }

@@ -11,6 +11,9 @@ export class SessionManager {
   readonly onDidSessionChange: vscode.Event<void> =
     this._onDidSessionChange.event;
 
+  /** Per-session tail of the metadata mutation chain. */
+  private locks = new Map<string, Promise<unknown>>();
+
   constructor(
     private readonly storageUri: vscode.Uri,
     private readonly memento: vscode.Memento,
@@ -141,7 +144,30 @@ export class SessionManager {
     this._onDidSessionChange.fire();
   }
 
-  public async addNode(sessionId: string, node: PipelineNode): Promise<void> {
+  /** Run read-modify-write mutations of one session's pipeline.json one at a time. */
+  private withLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.locks.get(sessionId) ?? Promise.resolve();
+    const next = prev.then(fn, fn);
+    const tail = next.catch(() => undefined);
+    this.locks.set(sessionId, tail);
+    void tail.then(() => {
+      if (this.locks.get(sessionId) === tail) {
+        this.locks.delete(sessionId);
+      }
+    });
+    return next;
+  }
+
+  public addNode(sessionId: string, node: PipelineNode): Promise<void> {
+    return this.withLock(sessionId, () =>
+      this.addNodeUnlocked(sessionId, node),
+    );
+  }
+
+  private async addNodeUnlocked(
+    sessionId: string,
+    node: PipelineNode,
+  ): Promise<void> {
     const metadata = await this.getMetadata(sessionId);
     metadata.nodes.push(node);
     await this.saveMetadata(sessionId, metadata);
@@ -155,7 +181,16 @@ export class SessionManager {
     return metadata.nodes.find((n) => n.id === nodeId);
   }
 
-  public async deleteNode(sessionId: string, nodeId: string): Promise<void> {
+  public deleteNode(sessionId: string, nodeId: string): Promise<void> {
+    return this.withLock(sessionId, () =>
+      this.deleteNodeUnlocked(sessionId, nodeId),
+    );
+  }
+
+  private async deleteNodeUnlocked(
+    sessionId: string,
+    nodeId: string,
+  ): Promise<void> {
     const metadata = await this.getMetadata(sessionId);
     const nodesToDelete = new Set<string>();
     const sessionUri = this.getSessionUri(sessionId);
@@ -189,7 +224,17 @@ export class SessionManager {
     await this.saveMetadata(sessionId, metadata);
   }
 
-  public async updateNode(
+  public updateNode(
+    sessionId: string,
+    id: string,
+    patch: Partial<PipelineNode>,
+  ): Promise<void> {
+    return this.withLock(sessionId, () =>
+      this.updateNodeUnlocked(sessionId, id, patch),
+    );
+  }
+
+  private async updateNodeUnlocked(
     sessionId: string,
     id: string,
     patch: Partial<PipelineNode>,
