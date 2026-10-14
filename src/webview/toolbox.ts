@@ -1,6 +1,7 @@
 import type { ToolResult } from "../tools/types";
 import type { ToolboxFromWebview, ToolboxToWebview, ToolMeta } from "./protocol";
-import { h, isTyping } from "./toolbox/dom";
+import { h, isTyping } from "./shared/dom";
+import { makeGuard } from "./shared/guard";
 import { Rail } from "./toolbox/rail";
 import { renderPane, valuesFor, type Pane, type ToolValues } from "./toolbox/pane";
 import { planSelect, shouldRender } from "./toolbox/selectPlan";
@@ -31,15 +32,7 @@ let sentFields: Record<string, string> = {};
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 /** Runs `fn`, and puts any exception in the error box rather than blanking the UI. */
-function guard<A extends unknown[]>(fn: (...args: A) => void): (...args: A) => void {
-  return (...args) => {
-    try {
-      fn(...args);
-    } catch (e) {
-      reportError(e);
-    }
-  };
-}
+const guard = makeGuard(reportError);
 
 function reportError(e: unknown): void {
   console.error(e);

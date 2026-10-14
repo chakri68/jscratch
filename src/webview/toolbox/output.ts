@@ -2,7 +2,7 @@ import "@vscode-elements/elements/dist/vscode-button/index.js";
 import "@vscode-elements/elements/dist/vscode-icon/index.js";
 import type { ToolResult } from "../../tools/types";
 import type { ToolMeta } from "../protocol";
-import { h, icon } from "./dom";
+import { h, icon } from "../shared/dom";
 
 export type OutputAction = "copy" | "insert" | "openEditor" | "sendToPipeline";
 

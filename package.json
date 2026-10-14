@@ -145,6 +145,12 @@
         "icon": "$(tools)"
       },
       {
+        "command": "jscratch.preview",
+        "title": "Preview Current File",
+        "category": "JScratch",
+        "icon": "$(table)"
+      },
+      {
         "command": "jscratch.deleteNode",
         "title": "Delete",
         "category": "JScratch",
@@ -249,6 +255,11 @@
           "group": "inline@2"
         },
         {
+          "command": "jscratch.preview",
+          "when": "view == jscratch.pipelineView && (viewItem == input || viewItem == output)",
+          "group": "inline@3"
+        },
+        {
           "command": "jscratch.deleteSession",
           "when": "view == jscratch.historyView && viewItem == session",
           "group": "inline"
@@ -347,6 +358,10 @@
         {
           "command": "jscratch.quick.json-yaml.0",
           "when": "false"
+        },
+        {
+          "command": "jscratch.preview",
+          "when": "resourceSet"
         }
       ],
       "editor/context": [
@@ -388,6 +403,13 @@
         {
           "command": "jscratch.quick.json-yaml.0",
           "group": "quick"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "jscratch.preview",
+          "when": "resourceScheme == datalab && resourceExtname =~ /\\.(json|csv|jsonl|ndjson|txt)$/",
+          "group": "navigation"
         }
       ]
     },

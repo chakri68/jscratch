@@ -38,3 +38,15 @@ test("every contributed command has category JScratch", () => {
     assert.equal(c.category, "JScratch", c.command);
   }
 });
+
+test("jscratch.preview is on input/output nodes, the editor title, and the palette", () => {
+  const menus = pkg.contributes.menus;
+  const inline = menus["view/item/context"].find(
+    (m: { command: string }) => m.command === "jscratch.preview",
+  );
+  assert.equal(inline?.group, "inline@3");
+  assert.match(inline?.when, /viewItem == input \|\| viewItem == output/);
+  const title = menus["editor/title"].find((m: { command: string }) => m.command === "jscratch.preview");
+  assert.ok(title?.when.includes("resourceScheme == datalab"));
+  assert.equal(commands.find((c) => c.command === "jscratch.preview")?.title, "Preview Current File");
+});

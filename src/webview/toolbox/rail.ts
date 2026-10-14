@@ -5,7 +5,7 @@ import "@vscode-elements/elements/dist/vscode-icon/index.js";
 import type { Category } from "../../tools/types";
 import { toolMatches } from "../../tools/search";
 import type { ToolMeta } from "../protocol";
-import { h, icon } from "./dom";
+import { h, icon } from "../shared/dom";
 
 const CATEGORIES: { id: Category; label: string; icon: string }[] = [
   { id: "encode", label: "Encode", icon: "symbol-key" },

@@ -1,3 +1,4 @@
+import type { ColumnInfo } from "../preview/schema";
 import type { Tool, ToolResult } from "../tools/types";
 
 /** Tool metadata sent to webviews; `run` stays in the extension host. */
@@ -34,6 +35,21 @@ export type ToolboxFromWebview =
   | { type: "requestSelection" }
   | { type: "requestClipboard" }
   | { type: "selected"; toolId: string };
-// Task 15 fills these two.
-export type PreviewToWebview = never;
-export type PreviewFromWebview = never;
+export type PreviewToWebview =
+  | {
+      type: "data";
+      file: string;
+      columns: string[];
+      // First jscratch.preview.maxRows rows; `schema` and `totalRows` cover all of them.
+      rows: unknown[][];
+      totalRows: number;
+      schema: ColumnInfo[];
+      warning?: string;
+    }
+  // summary: "object with 12 keys: a, b, c…", "string (3.2 KB)", "File was deleted", …
+  | { type: "notTabular"; file: string; summary: string; warning?: string };
+
+export type PreviewFromWebview =
+  // Sent once the script is listening; the host answers with the file's contents.
+  | { type: "ready" }
+  | { type: "openAsText" };

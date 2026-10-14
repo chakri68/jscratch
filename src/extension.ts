@@ -11,6 +11,7 @@ import { registerToolbox } from "./toolbox/toolboxPanel";
 import { ToolboxTreeDataProvider } from "./toolbox/toolboxTree";
 import { registerLauncher } from "./toolbox/launcher";
 import { registerEditorActions } from "./toolbox/editorActions";
+import { registerPreview } from "./preview/previewPanel";
 import { log } from "./log";
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -93,7 +94,7 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.languages.registerCodeLensProvider(
       { scheme: "datalab", language: "typescript" },
-      new TransformCodeLensProvider(),
+      new TransformCodeLensProvider(sessionManager),
     ),
   );
 
@@ -101,6 +102,7 @@ export async function activate(context: vscode.ExtensionContext) {
   registerToolbox(context, sessionManager);
   registerLauncher(context);
   registerEditorActions(context);
+  registerPreview(context, sessionManager, fileSystemProvider.onDidChangeFile);
   context.subscriptions.push(
     vscode.window.createTreeView("jscratch.toolboxView", {
       treeDataProvider: new ToolboxTreeDataProvider(),

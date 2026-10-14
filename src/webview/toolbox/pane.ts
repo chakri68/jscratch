@@ -7,7 +7,7 @@ import "@vscode-elements/elements/dist/vscode-button/index.js";
 import "@vscode-elements/elements/dist/vscode-icon/index.js";
 import type { ToolField, ToolOption } from "../../tools/types";
 import type { OptionValues, ToolMeta } from "../protocol";
-import { h, icon } from "./dom";
+import { h, icon } from "../shared/dom";
 import { OutputView, type OutputHandlers } from "./output";
 
 export interface ToolValues {
