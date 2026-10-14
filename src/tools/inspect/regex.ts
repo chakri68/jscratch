@@ -64,7 +64,7 @@ export const regex: Tool = {
       lines.push(`#${ranges.length} [${start}-${end}] ${JSON.stringify(m[0])}`);
       for (let i = 1; i < m.length; i++) {
         if (m[i] !== undefined) {
-          lines.push(`  ${names[i - 1] ?? `$${i}`} = ${JSON.stringify(m[i])}`);
+          lines.push(`  ${names[i - 1] ? `<${names[i - 1]}>` : `$${i}`} = ${JSON.stringify(m[i])}`);
         }
       }
       if (m[0] === "") {

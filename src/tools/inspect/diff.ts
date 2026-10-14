@@ -2,7 +2,10 @@ import type { Tool } from "../types";
 
 const MAX_LINES = 5000;
 
-const toLines = (s: string): string[] => (s === "" ? [] : s.split("\n"));
+const toLines = (s: string): string[] => {
+  const t = s.replace(/\r\n/g, "\n").replace(/\n$/, "");
+  return t === "" ? [] : t.split("\n");
+};
 
 function lcsLength(a: string[], b: string[]): number {
   let prev = new Int32Array(b.length + 1);

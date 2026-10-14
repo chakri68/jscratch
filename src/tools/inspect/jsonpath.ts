@@ -20,7 +20,7 @@ export const jsonpath: Tool = {
     }
     let results: unknown;
     try {
-      results = JSONPath({ path, json: doc as object, wrap: true });
+      results = JSONPath({ path, json: doc as object, wrap: true, eval: "safe" });
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }

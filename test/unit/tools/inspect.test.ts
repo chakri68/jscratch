@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runTool } from "../../../src/tools/registry";
-import { nextRuns } from "../../../src/tools/inspect/cron";
+import { nextRuns, fmt } from "../../../src/tools/inspect/cron";
 
 function ok(id: string, fields: Record<string, string>) {
   const r = runTool(id, fields);
@@ -20,13 +20,13 @@ test("regex: matches, ranges, groups", () => {
 test("regex: named groups", () => {
   const r = ok("regex", { pattern: "(?<n>\\d)", flags: "", text: "x7" });
   assert.ok(r.ok);
-  assert.equal(r.output, '#1 [1-2] "7"\n  n = "7"');
+  assert.equal(r.output, '#1 [1-2] "7"\n  <n> = "7"');
 });
 
 test("regex: mixed named and numbered groups", () => {
   const r = ok("regex", { pattern: "(a)(?<n>b)(?:c)(d)", flags: "", text: "abcd" });
   assert.ok(r.ok);
-  assert.equal(r.output, '#1 [0-4] "abcd"\n  $1 = "a"\n  n = "b"\n  $3 = "d"');
+  assert.equal(r.output, '#1 [0-4] "abcd"\n  $1 = "a"\n  <n> = "b"\n  $3 = "d"');
 });
 
 test("regex: invalid pattern and flags", () => {
@@ -106,7 +106,11 @@ test("cron tool: description and runs", () => {
   assert.ok(r.ok);
   assert.match(r.output, /Monday through Friday/);
   assert.match(r.output, /\n\nNext runs:\n/);
-  assert.equal(r.output.split("Next runs:\n")[1].split("\n").length, 5);
+  const lines = r.output.split("Next runs:\n")[1].split("\n");
+  assert.equal(lines.length, 5);
+  for (const l of lines) {
+    assert.match(l, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+  }
 });
 
 test("cron tool: rejects 6 fields and macros", () => {
@@ -114,4 +118,45 @@ test("cron tool: rejects 6 fields and macros", () => {
     const r = runTool("cron", { expression: e });
     assert.ok(!r.ok && /Only 5-field cron is supported/.test(r.error));
   }
+});
+
+test("jsonpath: unsafe eval is rejected", () => {
+  const r = runTool("jsonpath", {
+    json: '{"a":1}',
+    path: "$[?(@.constructor.constructor('return process')())]",
+  });
+  assert.equal(r.ok, false);
+});
+
+test("diff: CRLF and single trailing newline ignored", () => {
+  const r = ok("diff", { left: "a\r\nb\n", right: "a\nb" });
+  assert.ok(r.ok);
+  assert.equal(r.meta, "No differences");
+});
+
+test("cron: month-end, leap day, dow range with 7", () => {
+  const a = nextRuns("0 0 31 * *", new Date(2026, 3, 1), 3);
+  assert.deepEqual(a, [new Date(2026, 4, 31), new Date(2026, 6, 31), new Date(2026, 7, 31)]);
+  const b = nextRuns("0 0 29 2 *", new Date(2026, 9, 14), 1);
+  assert.deepEqual(b, [new Date(2028, 1, 29)]);
+  // 2026-01-01 is Thursday; 5-7 = Fri, Sat, Sun
+  const c = nextRuns("0 0 * * 5-7", new Date(2026, 0, 1), 3);
+  assert.deepEqual(c.map((d) => d.getDay()), [5, 6, 0]);
+});
+
+test("cron tool: first run formatted as local ISO", () => {
+  const first = nextRuns("*/15 * * * *", new Date(2026, 0, 1, 0, 7), 1)[0];
+  assert.equal(fmt(first), "2026-01-01 00:15");
+});
+
+test("regex: (?:) on empty text terminates with one match", () => {
+  const r = ok("regex", { pattern: "(?:)", flags: "", text: "" });
+  assert.ok(r.ok);
+  assert.equal((r.data as { ranges: number[][] }).ranges.length, 1);
+});
+
+test("regex: group labels survive lookbehind and ( in a class", () => {
+  const r = ok("regex", { pattern: "(?<!b)(?<=\\()(?<z>x)(y)", flags: "", text: "(xy" });
+  assert.ok(r.ok);
+  assert.equal(r.output, '#1 [1-3] "xy"\n  <z> = "x"\n  $2 = "y"');
 });

@@ -102,6 +102,12 @@ export function nextRuns(expr: string, from: Date, n: number): Date[] {
   return out;
 }
 
+const pad = (n: number) => String(n).padStart(2, "0");
+
+export function fmt(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export const cron: Tool = {
   id: "cron",
   title: "Cron Explain",
@@ -117,10 +123,8 @@ export const cron: Tool = {
     try {
       const runs = nextRuns(expr, new Date(), 5);
       const desc = cronstrue.toString(expr);
-      return {
-        ok: true,
-        output: `${desc}\n\nNext runs:\n${runs.map((r) => r.toLocaleString()).join("\n")}`,
-      };
+      const list = runs.length ? runs.map(fmt).join("\n") : "No runs in the next 5 years";
+      return { ok: true, output: `${desc}\n\nNext runs:\n${list}` };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
