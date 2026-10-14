@@ -9,6 +9,11 @@ import { jsonYaml } from "./convert/yaml";
 import { jsonCsv } from "./convert/csv";
 import { jsonToml } from "./convert/toml";
 import { jsonTs } from "./convert/tsTypes";
+import { uuid } from "./generate/uuid";
+import { timestamp } from "./generate/timestamp";
+import { hash } from "./generate/hash";
+import { lorem } from "./generate/lorem";
+import { random } from "./generate/random";
 
 // Order: encode -> convert -> generate -> inspect. Later tasks append here.
 const TOOLS: Tool[] = [
@@ -22,6 +27,11 @@ const TOOLS: Tool[] = [
   jsonCsv,
   jsonToml,
   jsonTs,
+  uuid,
+  timestamp,
+  hash,
+  lorem,
+  random,
 ];
 
 const MAX_FIELD = 5 * 1024 * 1024;
