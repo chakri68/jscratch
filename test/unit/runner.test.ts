@@ -52,6 +52,45 @@ test("timeout", async () => {
   assert.match(r.error!, /timed out after 500ms/);
 });
 
+// A killed child must be gone (exited and reaped) before runTransform returns:
+// Windows can't delete the temp dir while the process still has it as cwd.
+const alive = (pid: number) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+test("timeout waits for the killed process to exit", async () => {
+  let pid = 0;
+  const r = await run(
+    `function transform() { console.log(process.pid); while(true){} }`,
+    { timeoutMs: 500, onLog: (line) => (pid = Number(line)) },
+  );
+  assert.match(r.error!, /timed out/);
+  assert.ok(pid > 0, "child never reported its pid");
+  assert.strictEqual(alive(pid), false);
+});
+
+test("cancel waits for the killed process to exit", async () => {
+  const ac = new AbortController();
+  let pid = 0;
+  const r = await run(
+    `function transform() { console.log(process.pid); while(true){} }`,
+    {
+      signal: ac.signal,
+      onLog: (line) => {
+        pid = Number(line);
+        ac.abort();
+      },
+    },
+  );
+  assert.strictEqual(r.error, "Cancelled");
+  assert.strictEqual(alive(pid), false);
+});
+
 test("undefined result", async () => {
   const r = await run(`function transform() { }`);
   assert.strictEqual(

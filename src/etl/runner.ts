@@ -117,7 +117,8 @@ export async function runTransform(req: RunRequest): Promise<RunResult> {
     return done({ ok: false, error: String(e?.message ?? e) });
   } finally {
     try {
-      fs.rmSync(dir, { recursive: true, force: true });
+      // retries ride out transient Windows locks (antivirus, indexer)
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     } catch {}
   }
 }
@@ -142,6 +143,8 @@ function spawnAndWait(
 
     let settled = false;
     let timer: NodeJS.Timeout | undefined;
+    // Set when we kill the child; reported once it has actually exited.
+    let killedAs: Outcome | undefined;
     const finish = (o: Outcome) => {
       if (settled) return;
       settled = true;
@@ -149,15 +152,18 @@ function spawnAndWait(
       req.signal?.removeEventListener("abort", onAbort);
       resolve(o);
     };
-    const onAbort = () => {
+    // Resolve only after the child exits: it runs with the temp dir as cwd,
+    // and Windows won't delete that dir while the process is still in it.
+    // The cap covers a child that somehow never reports close.
+    const kill = (o: Outcome) => {
+      if (killedAs) return;
+      killedAs = o;
       child.kill("SIGKILL");
-      finish({ kind: "cancelled" });
+      setTimeout(() => finish(o), 2000).unref();
     };
+    const onAbort = () => kill({ kind: "cancelled" });
 
-    timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      finish({ kind: "timeout" });
-    }, req.timeoutMs);
+    timer = setTimeout(() => kill({ kind: "timeout" }), req.timeoutMs);
     req.signal?.addEventListener("abort", onAbort);
 
     const pipe = (
@@ -186,7 +192,7 @@ function spawnAndWait(
     child.on("close", (code) => {
       flushOut();
       flushErr();
-      finish({ kind: "exit", code });
+      finish(killedAs ?? { kind: "exit", code });
     });
   });
 }
