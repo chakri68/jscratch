@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <g transform="translate(1 2.62) scale(0.055)">
+    <defs>
+      <mask id="cut" maskUnits="userSpaceOnUse" x="-40" y="-40" width="480" height="420">
+        <rect x="-40" y="-40" width="480" height="420" fill="#fff"/>
+        <g fill="#000" stroke="#000" stroke-width="26" stroke-linejoin="round">
+        <path d="M62 336C196.1 250.5 321.2 140.9 400 40C289.5 104.8 164.5 214.3 62 336Z"/>
+        <path d="M124 230C178.3 200.2 235.9 145 268 92C213.7 121.8 156.1 177 124 230Z"/>
+        <path d="M212 274C276 242.4 344.8 181.6 384 122C320 153.6 251.2 214.4 212 274Z"/>
+        </g>
+        <path d="M290 136L420 22V90L290 205Z" fill="#000"/>
+      </mask>
+    </defs>
+    <g fill="none" stroke="currentColor" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" mask="url(#cut)">
+      <path d="M124 20H98Q60 20 60 58V128Q60 170 20 172Q60 174 60 216V284Q60 322 98 322H124"/>
+      <path d="M264 20H290Q328 20 328 58V128Q328 170 368 172Q328 174 328 216V284Q328 322 290 322H264"/>
+    </g>
+    <g fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linejoin="round">
+      <path d="M62 336C196.1 250.5 321.2 140.9 400 40C289.5 104.8 164.5 214.3 62 336Z"/>
+      <path d="M124 230C178.3 200.2 235.9 145 268 92C213.7 121.8 156.1 177 124 230Z"/>
+      <path d="M212 274C276 242.4 344.8 181.6 384 122C320 153.6 251.2 214.4 212 274Z"/>
+    </g>
+  </g>
+</svg>

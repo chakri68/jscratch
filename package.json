@@ -57,7 +57,7 @@
         {
           "id": "jscratch-explorer",
           "title": "JScratch",
-          "icon": "$(beaker)"
+          "icon": "media/activity.svg"
         }
       ]
     },
@@ -212,9 +212,11 @@
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js",
     "typecheck": "tsc --noEmit -p .",
-    "test:unit": "tsx --test \"test/unit/**/*.test.ts\""
+    "test:unit": "tsx --test \"test/unit/**/*.test.ts\"",
+    "icons": "node scripts/render-icon.mjs"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.1",
     "@types/node": "20.x",
