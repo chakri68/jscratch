@@ -1,46 +1,16 @@
 import * as vscode from "vscode";
-import * as path from "path";
-import { JScratchFileSystemProvider } from "./fileSystemProvider";
+import { JScratchFileSystemProvider } from "./etl/fileSystemProvider";
 import {
   SessionManager,
   PipelineNode,
   SessionMetadata,
-} from "./sessionManager";
-import { PipelineTreeDataProvider } from "./treeDataProvider";
-import { HistoryTreeDataProvider } from "./historyDataProvider";
-import { Executor } from "./executor";
-import { TransformCodeLensProvider } from "./codeLensProvider";
-
-function inferType(value: any, indent = ""): string {
-  if (value === null) {
-    return "any";
-  }
-  if (Array.isArray(value)) {
-    if (value.length === 0) {
-      return "any[]";
-    }
-    return `${inferType(value[0], indent)}[]`;
-  }
-  if (typeof value === "object") {
-    const keys = Object.keys(value);
-    if (keys.length === 0) {
-      return "{}";
-    }
-    const props = keys
-      .map((key) => {
-        const keyStr = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key)
-          ? key
-          : `"${key}"`;
-        return `${indent}    ${keyStr}: ${inferType(
-          value[key],
-          indent + "    ",
-        )};`;
-      })
-      .join("\n");
-    return `{\n${props}\n${indent}}`;
-  }
-  return typeof value;
-}
+} from "./etl/sessionManager";
+import { PipelineTreeDataProvider } from "./etl/pipelineTree";
+import { HistoryTreeDataProvider } from "./etl/historyTree";
+import { Executor } from "./etl/executor";
+import { TransformCodeLensProvider } from "./etl/codeLens";
+import { typeDefForFile } from "./etl/typeInference";
+import { transformTemplate, replaceTypeDefs } from "./etl/templates";
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('Congratulations, your extension "jscratch" is now active!');
@@ -221,20 +191,7 @@ export function activate(context: vscode.ExtensionContext) {
           const parentContentBytes =
             await vscode.workspace.fs.readFile(parentUri);
           const parentContent = new TextDecoder().decode(parentContentBytes);
-          const ext = path.extname(node.filename).toLowerCase();
-
-          if (ext === ".json") {
-            try {
-              const obj = JSON.parse(parentContent);
-              typeDefinition = inferType(obj, "    ");
-            } catch {
-              // Invalid JSON, fallback to any
-            }
-          } else if (ext === ".csv") {
-            typeDefinition = "string[][]";
-          } else if (ext === ".txt") {
-            typeDefinition = "string[]";
-          }
+          typeDefinition = typeDefForFile(node.filename, parentContent);
         } catch (e) {
           console.error("Failed to infer type:", e);
         }
@@ -243,33 +200,7 @@ export function activate(context: vscode.ExtensionContext) {
         const transformFilename = `transform-${timestamp}.ts`;
         const transformUri = vscode.Uri.joinPath(sessionUri, transformFilename);
 
-        const defaultScript = `
-import * as path from 'path';
-
-/* TYPE DEFS START */
-// Type definitions for the injected global 'input'
-interface InputData {
-    raw: string;
-    data: ${typeDefinition};
-}
-/* TYPE DEFS END */
-
-// Declare the global 'input' variable so TypeScript knows about it
-declare const input: InputData;
-
-/**
- * Transformation Script
- */
-export function transform(): any {
-    // TODO: Implement your transformation logic
-    // Example: return input.data.map((item: any) => item.id);
-    
-    if (typeof input !== 'undefined' && input.data) {
-        return input.data;
-    }
-    return {};
-}
-`;
+        const defaultScript = transformTemplate(typeDefinition);
         await vscode.workspace.fs.writeFile(
           transformUri,
           new TextEncoder().encode(defaultScript),
@@ -402,20 +333,7 @@ export function transform(): any {
           const parentContentBytes =
             await vscode.workspace.fs.readFile(parentUri);
           const parentContent = new TextDecoder().decode(parentContentBytes);
-          const ext = path.extname(parentNode.filename).toLowerCase();
-
-          if (ext === ".json") {
-            try {
-              const obj = JSON.parse(parentContent);
-              typeDefinition = inferType(obj, "    ");
-            } catch {
-              // Invalid JSON
-            }
-          } else if (ext === ".csv") {
-            typeDefinition = "string[][]";
-          } else if (ext === ".txt") {
-            typeDefinition = "string[]";
-          }
+          typeDefinition = typeDefForFile(parentNode.filename, parentContent);
         } catch (e) {
           console.error("Failed to infer type:", e);
         }
@@ -428,19 +346,8 @@ export function transform(): any {
           transformContentBytes,
         );
 
-        // Replace the InputData interface
-        const newInterface = `/* TYPE DEFS START */
-// Type definitions for the injected global 'input'
-interface InputData {
-    raw: string;
-    data: ${typeDefinition};
-}
-/* TYPE DEFS END */`;
-
-        const newContent = transformContent.replace(
-          /\/\* TYPE DEFS START \*\/[\s\S]*?\/\* TYPE DEFS END \*\//,
-          newInterface,
-        );
+        const newContent =
+          replaceTypeDefs(transformContent, typeDefinition) ?? transformContent;
 
         if (newContent !== transformContent) {
           await vscode.workspace.fs.writeFile(
