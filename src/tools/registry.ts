@@ -14,6 +14,10 @@ import { timestamp } from "./generate/timestamp";
 import { hash } from "./generate/hash";
 import { lorem } from "./generate/lorem";
 import { random } from "./generate/random";
+import { regex } from "./inspect/regex";
+import { jsonpath } from "./inspect/jsonpath";
+import { diff } from "./inspect/diff";
+import { cron } from "./inspect/cron";
 
 // Order: encode -> convert -> generate -> inspect. Later tasks append here.
 const TOOLS: Tool[] = [
@@ -32,6 +36,10 @@ const TOOLS: Tool[] = [
   hash,
   lorem,
   random,
+  regex,
+  jsonpath,
+  diff,
+  cron,
 ];
 
 const MAX_FIELD = 5 * 1024 * 1024;
